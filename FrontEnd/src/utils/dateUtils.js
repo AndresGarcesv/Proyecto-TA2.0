@@ -1,62 +1,319 @@
-// Utilidades para formatear fechas
-export const formatDate = (date) => {
-  return new Date(date).toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+// Utilidades para el manejo correcto de fechas con zona horaria de Colombia
+
+// Configuración de zona horaria para Colombia
+const COLOMBIA_TIMEZONE = 'America/Bogota';
+
+/**
+ * Formatea una fecha para mostrar en formato legible
+ * @param {string|Date} dateInput - Fecha en string ISO o objeto Date
+ * @returns {string} - Fecha formateada
+ */
+export const formatDateTime = (dateInput) => {
+  if (!dateInput) return '';
+  
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    
+    if (isNaN(date.getTime())) {
+      console.error('Fecha inválida:', dateInput);
+      return 'Fecha inválida';
+    }
+    
+    // Formatear en zona horaria de Colombia
+    const options = {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: COLOMBIA_TIMEZONE
+    };
+    
+    return date.toLocaleString('es-CO', options);
+  } catch (error) {
+    console.error('Error formateando fecha:', error);
+    return 'Error en fecha';
+  }
 };
 
-export const formatDateTime = (date) => {
-  return new Date(date).toLocaleString('es-CO', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+/**
+ * Formatea solo la fecha (sin hora)
+ * @param {string|Date} dateInput - Fecha en string ISO o objeto Date
+ * @returns {string} - Fecha formateada sin hora
+ */
+export const formatDate = (dateInput) => {
+  if (!dateInput) return '';
+  
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    const options = {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: COLOMBIA_TIMEZONE
+    };
+    
+    return date.toLocaleDateString('es-CO', options);
+  } catch (error) {
+    console.error('Error formateando fecha:', error);
+    return 'Error en fecha';
+  }
 };
 
-export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString('es-CO', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+/**
+ * Formatea solo la hora
+ * @param {string|Date} dateInput - Fecha en string ISO o objeto Date
+ * @returns {string} - Hora formateada
+ */
+export const formatTime = (dateInput) => {
+  if (!dateInput) return '';
+  
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    
+    if (isNaN(date.getTime())) {
+      return 'Hora inválida';
+    }
+    
+    const options = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: COLOMBIA_TIMEZONE
+    };
+    
+    return date.toLocaleTimeString('es-CO', options);
+  } catch (error) {
+    console.error('Error formateando hora:', error);
+    return 'Error en hora';
+  }
 };
 
-export const formatDateForInput = (date) => {
-  return new Date(date).toISOString().split('T')[0];
+/**
+ * Convierte una fecha a string en formato datetime-local para inputs HTML
+ * @param {Date} date - Objeto Date
+ * @returns {string} - String en formato YYYY-MM-DDTHH:MM
+ */
+export const dateToLocalString = (date) => {
+  if (!date || !(date instanceof Date)) return '';
+  
+  try {
+    // Crear una nueva fecha ajustada a la zona horaria local
+    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return localDate.toISOString().slice(0, 16);
+  } catch (error) {
+    console.error('Error convirtiendo fecha a string local:', error);
+    return '';
+  }
 };
 
-export const formatDateTimeForInput = (date) => {
-  return new Date(date).toISOString().slice(0, 16);
+/**
+ * Obtiene la fecha actual en Colombia
+ * @returns {Date} - Fecha actual en zona horaria de Colombia
+ */
+export const getCurrentColombiaDate = () => {
+  return new Date(new Date().toLocaleString("en-US", {timeZone: COLOMBIA_TIMEZONE}));
 };
 
-export const isToday = (date) => {
-  const today = new Date();
-  const checkDate = new Date(date);
-  return checkDate.toDateString() === today.toDateString();
+/**
+ * Verifica si una fecha es hoy
+ * @param {string|Date} dateInput - Fecha a verificar
+ * @returns {boolean} - True si es hoy
+ */
+export const isToday = (dateInput) => {
+  if (!dateInput) return false;
+  
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    const today = getCurrentColombiaDate();
+    
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  } catch (error) {
+    console.error('Error verificando si es hoy:', error);
+    return false;
+  }
 };
 
-export const isSameMonth = (date1, date2) => {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  return d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
+/**
+ * Verifica si una fecha es en el pasado
+ * @param {string|Date} dateInput - Fecha a verificar
+ * @returns {boolean} - True si es en el pasado
+ */
+export const isPastDate = (dateInput) => {
+  if (!dateInput) return false;
+  
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    const now = getCurrentColombiaDate();
+    
+    return date < now;
+  } catch (error) {
+    console.error('Error verificando si es fecha pasada:', error);
+    return false;
+  }
 };
 
-export const getMonthName = (month) => {
-  const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril',
-    'Mayo', 'Junio', 'Julio', 'Agosto',
-    'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-  return months[month];
+/**
+ * Obtiene el rango de fechas para un mes específico
+ * @param {number} year - Año
+ * @param {number} month - Mes (0-11)
+ * @returns {Object} - Objeto con fechas de inicio y fin del mes
+ */
+export const getMonthRange = (year, month) => {
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  
+  return { start, end };
 };
 
-export const getDayName = (day) => {
-  const days = [
-    'Domingo', 'Lunes', 'Martes', 'Miércoles',
-    'Jueves', 'Viernes', 'Sábado'
-  ];
-  return days[day];
+/**
+ * Formatea un rango de fechas para mostrar
+ * @param {string|Date} startDate - Fecha de inicio
+ * @param {string|Date} endDate - Fecha de fin
+ * @returns {string} - Rango formateado
+ */
+export const formatDateRange = (startDate, endDate) => {
+  if (!startDate || !endDate) return '';
+  
+  try {
+    const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+    const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+    
+    // Si es el mismo día, mostrar solo la fecha una vez con rango de horas
+    if (start.toDateString() === end.toDateString()) {
+      return `${formatDate(start)} de ${formatTime(start)} a ${formatTime(end)}`;
+    } else {
+      return `${formatDateTime(start)} - ${formatDateTime(end)}`;
+    }
+  } catch (error) {
+    console.error('Error formateando rango de fechas:', error);
+    return 'Error en rango';
+  }
+};
+
+/**
+ * Calcula la duración entre dos fechas en horas y minutos
+ * @param {string|Date} startDate - Fecha de inicio
+ * @param {string|Date} endDate - Fecha de fin
+ * @returns {string} - Duración formateada
+ */
+export const calculateDuration = (startDate, endDate) => {
+  if (!startDate || !endDate) return '';
+  
+  try {
+    const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+    const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+    
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours === 0) {
+      return `${diffMinutes} minutos`;
+    } else if (diffMinutes === 0) {
+      return `${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`;
+    } else {
+      return `${diffHours}h ${diffMinutes}m`;
+    }
+  } catch (error) {
+    console.error('Error calculando duración:', error);
+    return '';
+  }
+};
+
+/**
+ * Convierte una fecha del backend (que puede venir con zona horaria) a Date local
+ * @param {string} backendDate - Fecha del backend
+ * @returns {Date} - Objeto Date local
+ */
+export const parseBackendDate = (backendDate) => {
+  if (!backendDate) return null;
+  
+  try {
+    // El backend debería enviar fechas en formato ISO con zona horaria
+    return new Date(backendDate);
+  } catch (error) {
+    console.error('Error parseando fecha del backend:', error);
+    return null;
+  }
+};
+
+/**
+ * Prepara una fecha para enviar al backend
+ * @param {string} frontendDate - Fecha del input datetime-local
+ * @returns {string} - Fecha formateada para el backend
+ */
+export const prepareDateForBackend = (frontendDate) => {
+  if (!frontendDate) return '';
+  
+  try {
+    // El input datetime-local envía en formato "YYYY-MM-DDTHH:mm"
+    // El backend esperará este formato y aplicará la zona horaria correcta
+    return frontendDate;
+  } catch (error) {
+    console.error('Error preparando fecha para backend:', error);
+    return '';
+  }
+};
+
+/**
+ * Obtiene los días de un mes para el calendario
+ * @param {Date} currentDate - Fecha actual del calendario
+ * @returns {Array} - Array de objetos con información de los días
+ */
+export const getCalendarDays = (currentDate) => {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+  
+  const days = [];
+  const today = getCurrentColombiaDate();
+  
+  // Días del mes anterior
+  for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+    const prevMonthDay = new Date(year, month - 1, lastDay.getDate() - i);
+    days.push({
+      date: prevMonthDay,
+      isCurrentMonth: false,
+      isToday: false,
+      isPast: isPastDate(prevMonthDay)
+    });
+  }
+  
+  // Días del mes actual
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    days.push({
+      date: date,
+      isCurrentMonth: true,
+      isToday: isToday(date),
+      isPast: isPastDate(date)
+    });
+  }
+  
+  // Días del próximo mes para completar la grilla (42 celdas)
+  const remainingCells = 42 - days.length;
+  for (let day = 1; day <= remainingCells; day++) {
+    const nextMonthDay = new Date(year, month + 1, day);
+    days.push({
+      date: nextMonthDay,
+      isCurrentMonth: false,
+      isToday: false,
+      isPast: isPastDate(nextMonthDay)
+    });
+  }
+  
+  return days;
 };

@@ -3,7 +3,6 @@ import { Plus, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
 import AsistenciaForm from './AsistenciaForm';
-import AsistenciaModule from './AsistenciaModule';
 
 
 const AsistenciaList = ({ token }) => {

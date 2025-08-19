@@ -153,41 +153,6 @@ async def get_profesoras(
 async def get_current_profesora(current_user: Profesora = Depends(get_current_user)):
     return ProfesoraResponse.model_validate(current_user)
 
-# Endpoints de asistencia
-@app.post("/asistencia", response_model=AsistenciaResponse)
-async def crear_asistencia(
-    asistencia_data: AsistenciaCreate,
-    current_user: Profesora = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    asistencia = Asistencia(**asistencia_data.model_dump())
-    db.add(asistencia)
-    db.commit()
-    db.refresh(asistencia)
-    
-    return AsistenciaResponse.model_validate(asistencia)
-
-@app.get("/asistencia", response_model=List[AsistenciaResponse])
-async def get_asistencia(
-    profesora_id: Optional[int] = None,
-    fecha_inicio: Optional[datetime] = None,
-    fecha_fin: Optional[datetime] = None,
-    current_user: Profesora = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    query = db.query(Asistencia)
-    
-    if profesora_id:
-        query = query.filter(Asistencia.profesora_id == profesora_id)
-    
-    if fecha_inicio:
-        query = query.filter(Asistencia.fecha >= fecha_inicio)
-    
-    if fecha_fin:
-        query = query.filter(Asistencia.fecha <= fecha_fin)
-    
-    asistencias = query.all()
-    return [AsistenciaResponse.model_validate(a) for a in asistencias]
 
 # Endpoints de clases
 @app.post("/clases", response_model=ClaseResponse)
