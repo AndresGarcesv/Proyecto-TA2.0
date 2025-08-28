@@ -9,6 +9,8 @@ from typing import List, Optional
 import jwt
 from passlib.context import CryptContext
 import uvicorn
+import os
+from dotenv import load_dotenv
 
 # Importaciones locales
 from database import get_db, engine
