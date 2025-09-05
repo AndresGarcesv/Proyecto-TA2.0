@@ -1,106 +1,145 @@
-import { API_BASE_URL, authenticatedFetch } from '../utils/api';
+import { authenticatedFetch } from '../utils/api';
 
-// Servicio para manejar asistencias
 export const asistenciaService = {
-  // Obtener resumen de aprendices
-  obtenerResumen: async () => {
-    const response = await authenticatedFetch('/asistencia/listas/');
-    if (!response.ok) {
-      throw new Error('Error al obtener resumen de aprendices');
+  // Obtener asistencias con filtros
+  async obtenerAsistencias(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.profesora_id) params.append('profesora_id', filters.profesora_id);
+      if (filters.fecha_inicio) params.append('fecha_inicio', filters.fecha_inicio);
+      if (filters.fecha_fin) params.append('fecha_fin', filters.fecha_fin);
+
+      const response = await authenticatedFetch(`/asistencia?${params}`);
+      if (response && response.ok) {
+        const data = await response.json();
+        return data || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching asistencias:', error);
+      throw new Error('Error al obtener asistencias: ' + error.message);
     }
-    return response.json();
+  },
+
+  // Crear nueva asistencia
+  async crearAsistencia(asistenciaData) {
+    try {
+      const response = await authenticatedFetch('/asistencia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(asistenciaData),
+      });
+
+      if (response && response.ok) {
+        return await response.json();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al crear asistencia');
+      }
+    } catch (error) {
+      console.error('Error creating asistencia:', error);
+      throw error;
+    }
+  },
+
+  // Obtener resumen de aprendices
+  async obtenerResumen() {
+    try {
+  // El backend expone /asistencia/listas/ para el resumen de aprendices
+  const response = await authenticatedFetch('/asistencia/listas/');
+      if (response && response.ok) {
+        const data = await response.json();
+        return data || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching resumen:', error);
+      throw new Error('Error al obtener resumen: ' + error.message);
+    }
   },
 
   // Obtener detalle de un aprendiz
-  detalleAprendiz: async (id) => {
-    const response = await authenticatedFetch(`/asistencia/detalle/${id}`);
-    if (!response.ok) {
-      throw new Error('Error al obtener detalle del aprendiz');
+  async detalleAprendiz(id) {
+    try {
+      const response = await authenticatedFetch(`/aprendices/${id}/detalle`);
+      if (response && response.ok) {
+        const data = await response.json();
+        return data;
+      }
+      throw new Error('No se pudo obtener el detalle del aprendiz');
+    } catch (error) {
+      console.error('Error fetching detalle aprendiz:', error);
+      throw error;
     }
-    return response.json();
   },
 
-  // Toggle asistencia
-  toggleAsistencia: async (aprendizId, fechaIso, presente) => {
-    const response = await authenticatedFetch('/asistencia/toggle/', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        aprendiz_id: aprendizId,
-        fecha: fechaIso,
-        presente: presente
-      })
-    });
-    if (!response.ok) {
+  // Toggle asistencia de un aprendiz
+  async toggleAsistencia(aprendizId, fechaIso, presente) {
+    try {
+      // El backend espera PATCH en /asistencia/toggle/
+      const response = await authenticatedFetch('/asistencia/toggle/', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          aprendiz_id: aprendizId,
+          fecha: fechaIso,
+          presente: presente
+        }),
+      });
+
+      if (response && response.ok) {
+        // El endpoint retorna { ok: True }
+        return await response.json();
+      }
       throw new Error('Error al actualizar asistencia');
+    } catch (error) {
+      console.error('Error toggling asistencia:', error);
+      throw error;
     }
-    return response.json();
   },
 
-  // Importar Excel
-  importarExcel: async (file, nombreLista = '') => {
-    const formData = new FormData();
-    formData.append('archivo', file);
-    if (nombreLista) {
-      formData.append('nombre_lista', nombreLista);
-    }
+  // Importar desde Excel
+  async importarExcel(file, nombreLista) {
+    try {
+      const formData = new FormData();
+      // Backend espera el campo 'archivo'
+      formData.append('archivo', file);
+      if (nombreLista) {
+        formData.append('nombre_lista', nombreLista);
+      }
 
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/asistencia/importar/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        // NO incluir Content-Type para FormData
-      },
-      body: formData
-    });
+      const response = await authenticatedFetch('/asistencia/importar/', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Error al importar archivo');
+      if (response && response.ok) {
+        return await response.json();
+      }
+      throw new Error('Error al importar archivo');
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+      throw error;
     }
-    return response.json();
   },
 
-  // Exportar CSV
-  exportarCSV: async () => {
-    const response = await authenticatedFetch('/asistencia/exportar/');
-    if (!response.ok) {
+  // Exportar a CSV
+  async exportarCSV() {
+    try {
+      // Backend expone /asistencia/exportar/
+      const response = await authenticatedFetch('/asistencia/exportar/');
+      if (response && response.ok) {
+        // Devolver blob para descargar correctamente
+        return await response.blob();
+      }
       throw new Error('Error al exportar CSV');
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      throw error;
     }
-    return response.text(); // Retorna el contenido del CSV como texto
-  },
-
-  // Obtener asistencias con filtros (para la tabla principal)
-  obtenerAsistencias: async (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    
-    const response = await authenticatedFetch(`/asistencia/?${params}`);
-    if (!response.ok) {
-      throw new Error('Error al obtener asistencias');
-    }
-    return response.json();
-  },
-
-  // Crear asistencia individual
-  crearAsistencia: async (asistenciaData) => {
-    const response = await authenticatedFetch('/asistencia/', {
-      method: 'POST',
-      body: JSON.stringify(asistenciaData)
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Error al crear asistencia');
-    }
-    return response.json();
   }
 };
-
-// Exports individuales para compatibilidad
-export const obtenerResumen = asistenciaService.obtenerResumen;
-export const detalleAprendiz = asistenciaService.detalleAprendiz;
-export const toggleAsistencia = asistenciaService.toggleAsistencia;
-export const importarExcel = asistenciaService.importarExcel;
-export const exportarCSV = asistenciaService.exportarCSV;

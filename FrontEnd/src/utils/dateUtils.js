@@ -3,6 +3,31 @@
 // Configuración de zona horaria para Colombia
 const COLOMBIA_TIMEZONE = 'America/Bogota';
 
+// Helper: obtiene las partes de fecha/hora en una zona horaria especificada
+const getTZDateParts = (date, timeZone) => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric'
+    });
+
+    const parts = {};
+    formatter.formatToParts(date).forEach((p) => {
+      if (p.type !== 'literal') parts[p.type] = p.value;
+    });
+
+    return parts; // { year, month, day, hour, minute, second }
+  } catch (error) {
+    console.error('Error obteniendo partes TZ:', error);
+    return null;
+  }
+};
+
 /**
  * Formatea una fecha para mostrar en formato legible
  * @param {string|Date} dateInput - Fecha en string ISO o objeto Date
@@ -118,7 +143,8 @@ export const dateToLocalString = (date) => {
  * @returns {Date} - Fecha actual en zona horaria de Colombia
  */
 export const getCurrentColombiaDate = () => {
-  return new Date(new Date().toLocaleString("en-US", {timeZone: COLOMBIA_TIMEZONE}));
+  // Devuelve el instante actual (Date) — las comparaciones por día usan getTZDateParts
+  return new Date();
 };
 
 /**
@@ -131,11 +157,17 @@ export const isToday = (dateInput) => {
   
   try {
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    const today = getCurrentColombiaDate();
-    
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
+
+    const dParts = getTZDateParts(date, COLOMBIA_TIMEZONE);
+    const nowParts = getTZDateParts(new Date(), COLOMBIA_TIMEZONE);
+
+    if (!dParts || !nowParts) return false;
+
+    return (
+      dParts.year === nowParts.year &&
+      dParts.month === nowParts.month &&
+      dParts.day === nowParts.day
+    );
   } catch (error) {
     console.error('Error verificando si es hoy:', error);
     return false;
@@ -151,10 +183,9 @@ export const isPastDate = (dateInput) => {
   if (!dateInput) return false;
   
   try {
-    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    const now = getCurrentColombiaDate();
-    
-    return date < now;
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  // Comparar instantes: si la fecha (instante) es menor que ahora, está en el pasado
+  return date.getTime() < Date.now();
   } catch (error) {
     console.error('Error verificando si es fecha pasada:', error);
     return false;
@@ -238,7 +269,18 @@ export const parseBackendDate = (backendDate) => {
   if (!backendDate) return null;
   
   try {
-    // El backend debería enviar fechas en formato ISO con zona horaria
+    // Normalizar fechas recibidas del backend:
+    // - Si la cadena ya contiene información de zona (Z o +hh:mm), respetarla
+    // - Si es una marca naive como '2025-09-05T14:00:00', asumir UTC y añadir 'Z'
+    if (typeof backendDate === 'string') {
+      const hasTZ = /([zZ]|[+\-]\d\d:?\d\d)$/.test(backendDate);
+      const normalized = hasTZ ? backendDate : backendDate + 'Z';
+      return new Date(normalized);
+    }
+
+    // Si ya es Date
+    if (backendDate instanceof Date) return backendDate;
+
     return new Date(backendDate);
   } catch (error) {
     console.error('Error parseando fecha del backend:', error);

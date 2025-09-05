@@ -248,6 +248,9 @@ const AsistenciaList = ({ token }) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Presente
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
@@ -278,6 +281,33 @@ const AsistenciaList = ({ token }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(asistencia.fecha)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="checkbox"
+                        checked={asistencia.presente}
+                        onChange={async (e) => {
+                          const nuevoEstado = e.target.checked;
+                          try {
+                            const response = await fetch(`${API_BASE_URL}/asistencia/${asistencia.id}`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({ presente: nuevoEstado }),
+                            });
+                            if (response.ok) {
+                              fetchAsistencias();
+                            } else {
+                              alert('Error al actualizar asistencia');
+                            }
+                          } catch (error) {
+                            alert('Error de conexión al actualizar asistencia');
+                          }
+                        }}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

@@ -5,7 +5,7 @@ import { formatDate } from '../utils/dateUtils';
 import AsistenciaForm from './AsistenciaForm';
 import { asistenciaService } from './AsistenciaService';
 
-const AsistenciaList = ({ token }) => {
+const AsistenciaModule = ({ token }) => {
   const [asistencias, setAsistencias] = useState([]);
   const [profesoras, setProfesoras] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +59,7 @@ const AsistenciaList = ({ token }) => {
       const response = await authenticatedFetch('/profesoras');
       if (response && response.ok) {
         const data = await response.json();
-        setProfesoras(data);
+        setProfesoras(data || []);
       }
     } catch (error) {
       console.error('Error fetching profesoras:', error);
@@ -98,7 +98,7 @@ const AsistenciaList = ({ token }) => {
   async function cargarResumen() {
     try {
       const res = await asistenciaService.obtenerResumen();
-      setAprendices(res);
+      setAprendices(res || []);
     } catch (e) {
       console.error(e);
       alert("Error cargando resumen de aprendices: " + e.message);
@@ -166,6 +166,22 @@ const AsistenciaList = ({ token }) => {
   }
   // ----------------------------------------
 
+  // Función auxiliar para obtener nombre seguro
+  const getNombreSeguro = (obj, defaultValue = 'N/A') => {
+    return obj && obj.nombre ? obj.nombre : defaultValue;
+  };
+
+  // Función auxiliar para obtener especialidad segura
+  const getEspecialidadSegura = (profesora, defaultValue = 'Sin especialidad') => {
+    return profesora && profesora.especialidad ? profesora.especialidad : defaultValue;
+  };
+
+  // Buscar profesora por id en la lista cargada
+  const findProfesoraById = (id) => {
+    if (!id) return null;
+    return profesoras.find(p => p.id === id) || null;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -208,7 +224,7 @@ const AsistenciaList = ({ token }) => {
               <option value="">Todas las profesoras</option>
               {profesoras.map((profesora) => (
                 <option key={profesora.id} value={profesora.id}>
-                  {profesora.nombre}
+                  {getNombreSeguro(profesora)}
                 </option>
               ))}
             </select>
@@ -301,32 +317,58 @@ const AsistenciaList = ({ token }) => {
                       <div className="flex items-center">
                         <div className="bg-indigo-100 h-10 w-10 rounded-full flex items-center justify-center">
                           <span className="text-indigo-600 font-medium text-sm">
-                            {asistencia.profesora.nombre.charAt(0)}
+                            {getNombreSeguro(asistencia.profesora, 'P').charAt(0)}
                           </span>
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {asistencia.profesora.nombre}
+                            {getNombreSeguro(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {asistencia.profesora.especialidad}
+                            {getEspecialidadSegura(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {asistencia.aprendiz?.nombre || 'N/A'}
+                        {getNombreSeguro(asistencia.aprendiz)}
                       </div>
                       <div className="text-sm text-gray-500">
                         {asistencia.aprendiz?.documento || 'Sin documento'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(asistencia.fecha)}
+                      {asistencia.fecha ? formatDate(asistencia.fecha) : 'Sin fecha'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
+                        {/* Checkbox para marcar presente/ausente en la fila */}
+                        <input
+                          type="checkbox"
+                          className="mr-3 h-4 w-4"
+                          checked={!!asistencia.presente}
+                          onChange={async () => {
+                            // Llamar al servicio para togglear y actualizar estado local
+                            try {
+                              await asistenciaService.toggleAsistencia(asistencia.aprendiz_id || asistencia.aprendiz?.id, asistencia.fecha, !asistencia.presente);
+                              // Actualizar lista de asistencias
+                              setAsistencias(prev => prev.map(a => a.id === asistencia.id ? { ...a, presente: !a.presente } : a));
+                              // Actualizar resumen de aprendices si corresponde
+                              setAprendices(prev => prev.map(p => {
+                                if (p.id === (asistencia.aprendiz_id || asistencia.aprendiz?.id)) {
+                                  const delta = asistencia.presente ? -1 : 1;
+                                  return { ...p, total: (p.total || 0) + delta };
+                                }
+                                return p;
+                              }));
+                            } catch (e) {
+                              console.error('Error toggling asistencia row:', e);
+                              alert('No se pudo actualizar asistencia: ' + (e.message || e));
+                            }
+                          }}
+                        />
+
                         {asistencia.presente ? (
                           <>
                             <CheckCircle className="text-green-500 mr-2" size={20} />
@@ -376,11 +418,11 @@ const AsistenciaList = ({ token }) => {
               {aprendices.map(a => (
                 <li key={a.id} className="flex justify-between items-center border-b py-1">
                   <div>
-                    <strong>{a.nombre}</strong>
-                    <div className="text-sm text-gray-600">{a.documento}</div>
+                    <strong>{getNombreSeguro(a)}</strong>
+                    <div className="text-sm text-gray-600">{a.documento || 'Sin documento'}</div>
                   </div>
                   <div className="flex gap-2">
-                    <div className="text-sm">Total: {a.total}</div>
+                    <div className="text-sm">Total: {a.total || 0}</div>
                     <button className="text-sm bg-gray-200 px-2 rounded" onClick={() => verDetalle(a.id)}>Ver</button>
                   </div>
                 </li>
@@ -391,19 +433,19 @@ const AsistenciaList = ({ token }) => {
           <div className="col-span-2">
             {detalle ? (
               <div>
-                <h3 className="font-semibold">{detalle.nombre} - {detalle.documento}</h3>
+                <h3 className="font-semibold">{getNombreSeguro(detalle)} - {detalle.documento || 'Sin documento'}</h3>
                 <table className="table-auto border-collapse w-full mt-2">
                   <thead>
                     <tr>
-                      {detalle.fechas.map(f =>
+                      {(detalle.fechas || []).map(f =>
                         <th key={f} className="border p-1 text-sm">{new Date(f).toLocaleDateString()}</th>
                       )}
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      {detalle.fechas.map(f => {
-                        const val = detalle.asistencias[f] || false;
+                      {(detalle.fechas || []).map(f => {
+                        const val = detalle.asistencias && detalle.asistencias[f] || false;
                         return (
                           <td key={f} className="border p-2 text-center">
                             <input type="checkbox" checked={!!val} onChange={() => onToggle(detalle.id, f, !!val)} />
@@ -424,4 +466,4 @@ const AsistenciaList = ({ token }) => {
   );
 };
 
-export default AsistenciaList;
+export default AsistenciaModule;

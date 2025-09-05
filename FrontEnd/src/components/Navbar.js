@@ -1,18 +1,21 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, Calendar, LogOut, User } from 'lucide-react';
+import { Home, Users, Calendar, LogOut, User, Shield } from 'lucide-react';
 
 const Navbar = ({ user, onLogout }) => {
   const location = useLocation();
 
   const isActive = (path) => location.pathname === path;
 
-  const navItems = [
-    { path: '/', icon: Home, label: 'Dashboard' },
-    { path: '/asistencia', icon: Users, label: 'Asistencia' },
-    { path: '/calendario', icon: Calendar, label: 'Calendario' },
-  ];
-
+const navItems = [
+  { path: '/', icon: Home, label: 'Dashboard' },
+  { path: '/asistencia', icon: Users, label: 'Asistencia' },
+  { path: '/calendario', icon: Calendar, label: 'Calendario' },
+  ...(user?.is_admin ? [
+    { path: '/profesoras', icon: Shield, label: 'Profesoras' },
+    { path: '/aprendices', icon: Users, label: 'Aprendices' }
+  ] : [])
+];
   return (
     <nav className="bg-white shadow-lg border-b">
       <div className="container mx-auto px-4">

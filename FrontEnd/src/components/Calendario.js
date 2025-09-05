@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, User, Edit, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 import { 
   formatDateTime, 
@@ -9,16 +9,20 @@ import {
   parseBackendDate,
   getCurrentColombiaDate,
   isToday
+  , formatTime
 } from '../utils/dateUtils';
 import ClaseForm from './ClaseForm';
 
-const Calendario = ({ token }) => {
+const Calendario = ({ token, user }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clases, setClases] = useState([]);
   const [profesoras, setProfesoras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [editingClase, setEditingClase] = useState(null);
+  const [selectedClase, setSelectedClase] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const meses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -34,30 +38,30 @@ const Calendario = ({ token }) => {
 
   const fetchClases = async () => {
     try {
+      console.log('fetchClases ejecutado');
       setLoading(true);
-      const año = currentDate.getFullYear();
-      const mes = currentDate.getMonth() + 1;
-      
-      const response = await fetch(
-        `${API_BASE_URL}/clases/calendario?mes=${mes}&año=${año}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-      
+  const anio = currentDate.getFullYear();
+  const mes = currentDate.getMonth() + 1;
+  // Use the backend endpoint that expects /calendario/mes and parameter 'anio'
+  const url = `${API_BASE_URL}/clases/calendario/mes?mes=${mes}&anio=${anio}`;
+      console.log('Consultando URL:', url);
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
-        // Procesar las fechas del backend
         const clasesProcessed = data.map(clase => ({
           ...clase,
           fecha_inicio: parseBackendDate(clase.fecha_inicio),
           fecha_fin: parseBackendDate(clase.fecha_fin)
         }));
+        console.log('Clases recibidas del backend:', clasesProcessed);
         setClases(clasesProcessed);
       } else {
-        console.error('Error response:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', response.status, errorText);
         setClases([]);
       }
     } catch (error) {
@@ -86,8 +90,14 @@ const Calendario = ({ token }) => {
 
   const handleCreateClase = async (claseData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/clases`, {
-        method: 'POST',
+      const url = editingClase 
+        ? `${API_BASE_URL}/clases/${editingClase.id}` 
+        : `${API_BASE_URL}/clases`;
+      
+      const method = editingClase ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -96,16 +106,51 @@ const Calendario = ({ token }) => {
       });
 
       if (response.ok) {
-        await fetchClases(); // Refrescar las clases
+        await fetchClases();
         setShowForm(false);
         setSelectedDate(null);
+        setEditingClase(null);
+        
+        // Mostrar mensaje de éxito
+        alert(editingClase ? 'Clase actualizada exitosamente' : 'Clase creada exitosamente');
       } else {
         const errorData = await response.json();
-        alert('Error al crear clase: ' + (errorData.detail || 'Error desconocido'));
+        alert(`Error al ${editingClase ? 'actualizar' : 'crear'} clase: ` + (errorData.detail || 'Error desconocido'));
       }
     } catch (error) {
-      console.error('Error creating clase:', error);
-      alert('Error de conexión al crear clase');
+      console.error('Error with clase:', error);
+      alert('Error de conexión al procesar la clase');
+    }
+  };
+
+  const handleEditClase = (clase) => {
+    setEditingClase(clase);
+    setShowForm(true);
+  };
+
+  const handleDeleteClase = async () => {
+    if (!selectedClase) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/clases/${selectedClase.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        await fetchClases();
+        setShowDeleteModal(false);
+        setSelectedClase(null);
+        alert('Clase eliminada exitosamente');
+      } else {
+        const errorData = await response.json();
+        alert('Error al eliminar clase: ' + (errorData.detail || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error deleting clase:', error);
+      alert('Error de conexión al eliminar clase');
     }
   };
 
@@ -131,9 +176,54 @@ const Calendario = ({ token }) => {
   const handleDateClick = (day) => {
     if (day.isCurrentMonth) {
       setSelectedDate(day.date);
+      setEditingClase(null);
       setShowForm(true);
     }
   };
+
+  const canEditClase = (clase) => {
+    return user?.is_admin || clase.profesora_id === user?.id;
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setSelectedDate(null);
+    setEditingClase(null);
+  };
+
+  // Modal de confirmación para eliminar
+  const DeleteConfirmModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Confirmar Eliminación
+          </h3>
+          <p className="text-gray-600 mb-6">
+            ¿Estás segura de que deseas eliminar la clase "{selectedClase?.titulo}"?
+            Esta acción no se puede deshacer.
+          </p>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => {
+                setShowDeleteModal(false);
+                setSelectedClase(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDeleteClase}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -154,7 +244,11 @@ const Calendario = ({ token }) => {
           <p className="text-gray-600">Programa y visualiza las clases del colegio y TecnoAcademia</p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setEditingClase(null);
+            setSelectedDate(null);
+            setShowForm(true);
+          }}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 transition-colors"
         >
           <Plus size={20} />
@@ -225,14 +319,14 @@ const Calendario = ({ token }) => {
                         clase.ubicacion === 'Colegio' ? 'bg-green-500 hover:bg-green-600' : 'bg-purple-500 hover:bg-purple-600'
                       } transition-colors`}
                       title={`${clase.titulo} - ${clase.profesora.nombre} - ${formatDateTime(clase.fecha_inicio)}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Aquí podrías abrir un modal con detalles de la clase
+                      }}
                     >
                       <div className="font-medium">{clase.titulo}</div>
-                      <div className="opacity-90">
-                        {clase.fecha_inicio && new Date(clase.fecha_inicio).toLocaleTimeString('es-CO', { 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
+                        <div className="opacity-90">
+                        {clase.fecha_inicio && formatTime(clase.fecha_inicio)}
                       </div>
                     </div>
                   ))}
@@ -287,6 +381,7 @@ const Calendario = ({ token }) => {
                 .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio))
                 .map((clase) => {
                   const isClasePast = clase.fecha_fin && new Date(clase.fecha_fin) < getCurrentColombiaDate();
+                  const canEdit = canEditClase(clase);
                   
                   return (
                     <div 
@@ -306,11 +401,34 @@ const Calendario = ({ token }) => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <h4 className="text-lg font-medium text-gray-900">{clase.titulo}</h4>
-                          {isClasePast && (
-                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
-                              Finalizada
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {isClasePast && (
+                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                                Finalizada
+                              </span>
+                            )}
+                            {canEdit && !isClasePast && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleEditClase(clase)}
+                                  className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                                  title="Editar clase"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedClase(clase);
+                                    setShowDeleteModal(true);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                  title="Eliminar clase"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="flex items-center mt-1 text-sm text-gray-500">
@@ -354,18 +472,20 @@ const Calendario = ({ token }) => {
         )}
       </div>
 
-      {/* Formulario de nueva clase */}
+      {/* Formulario de nueva/editar clase */}
       {showForm && (
         <ClaseForm
           profesoras={profesoras}
           selectedDate={selectedDate}
+          editingClase={editingClase}
+          user={user}
           onSubmit={handleCreateClase}
-          onCancel={() => {
-            setShowForm(false);
-            setSelectedDate(null);
-          }}
+          onCancel={handleFormCancel}
         />
       )}
+
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteModal && <DeleteConfirmModal />}
     </div>
   );
 };

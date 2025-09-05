@@ -1,32 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
-  // Función para convertir una fecha a string en formato datetime-local
+const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel, user, editingClase }) => {
+  // Función para convertir una fecha a string en formato datetime-local (zona horaria local)
   const dateToLocalString = (date) => {
     if (!date) return '';
     
-    // Crear una nueva fecha en la zona horaria local
-    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-    return localDate.toISOString().slice(0, 16);
+    // Asegurarse de que es un objeto Date válido
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    // Formatear para datetime-local input
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // Función para obtener la fecha inicial (fecha seleccionada o fecha actual)
+  // Función para obtener la fecha inicial
   const getInitialDate = () => {
     if (selectedDate) {
-      // Si hay una fecha seleccionada, usar esa fecha a las 8:00 AM
       const initialDate = new Date(selectedDate);
       initialDate.setHours(8, 0, 0, 0);
       return initialDate;
     }
     
-    // Si no, usar la fecha actual
     const now = new Date();
-    now.setMinutes(0, 0, 0); // Redondear a la hora más cercana
+    now.setMinutes(0, 0, 0);
     return now;
   };
 
-  // Función para obtener la fecha final (2 horas después de la inicial)
+  // Función para obtener la fecha final (2 horas después)
   const getInitialEndDate = () => {
     const startDate = getInitialDate();
     const endDate = new Date(startDate);
@@ -35,7 +42,7 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
   };
 
   const [formData, setFormData] = useState({
-    profesora_id: '',
+    profesora_id: user?.id || '',
     titulo: '',
     fecha_inicio: dateToLocalString(getInitialDate()),
     fecha_fin: dateToLocalString(getInitialEndDate()),
@@ -43,49 +50,116 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
     descripcion: ''
   });
 
-  const handleSubmit = (e) => {
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Actualizar profesora_id si cambia el usuario
+  useEffect(() => {
+    if (user?.id && !formData.profesora_id) {
+      setFormData(prev => ({
+        ...prev,
+        profesora_id: user.id
+      }));
+    }
+  }, [user]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.profesora_id) {
+      newErrors.profesora_id = 'Debe seleccionar una profesora';
+    }
+    
+    if (!formData.titulo.trim()) {
+      newErrors.titulo = 'El título es requerido';
+    }
+    
+    if (!formData.fecha_inicio) {
+      newErrors.fecha_inicio = 'La fecha de inicio es requerida';
+    }
+    
+    if (!formData.fecha_fin) {
+      newErrors.fecha_fin = 'La fecha de fin es requerida';
+    }
+    
+    if (formData.fecha_inicio && formData.fecha_fin) {
+      const startDate = new Date(formData.fecha_inicio);
+      const endDate = new Date(formData.fecha_fin);
+      
+      if (endDate <= startDate) {
+        newErrors.fecha_fin = 'La fecha de fin debe ser posterior a la fecha de inicio';
+      }
+      
+      // Validar que no sea en el pasado (permitir hoy)
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      
+      if (startDay < today) {
+        newErrors.fecha_inicio = 'No se pueden programar clases en fechas pasadas';
+      }
+      
+      // Validar duración mínima de 30 minutos
+      const diffMinutes = (endDate - startDate) / (1000 * 60);
+      if (diffMinutes < 30) {
+        newErrors.fecha_fin = 'La clase debe durar al menos 30 minutos';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Crear objetos Date para validación
-    const startDate = new Date(formData.fecha_inicio);
-    const endDate = new Date(formData.fecha_fin);
-    
-    // Validar que la fecha de fin sea posterior a la de inicio
-    if (endDate <= startDate) {
-      alert('La fecha de fin debe ser posterior a la fecha de inicio');
+    if (!validateForm()) {
       return;
     }
 
-    // Validar que las fechas no sean en el pasado (excepto si es el día de hoy)
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    setIsSubmitting(true);
     
-    if (startDay < today) {
-      alert('No se pueden programar clases en fechas pasadas');
-      return;
-    }
+    try {
+      // Convertir las fechas al formato ISO esperado por el backend
+      const startDate = new Date(formData.fecha_inicio);
+      const endDate = new Date(formData.fecha_fin);
+      
+      const submitData = {
+        ...formData,
+        profesora_id: parseInt(formData.profesora_id),
+        titulo: formData.titulo.trim(),
+        // Enviar fechas en formato ISO
+        fecha_inicio: startDate.toISOString(),
+        fecha_fin: endDate.toISOString(),
+        descripcion: formData.descripcion.trim()
+      };
 
-    // Enviar los datos con las fechas en formato string
-    // El backend se encargará de parsear correctamente las fechas
-    onSubmit({
-      ...formData,
-      profesora_id: parseInt(formData.profesora_id),
-      // Enviar las fechas como string en formato ISO
-      fecha_inicio: formData.fecha_inicio,
-      fecha_fin: formData.fecha_fin
-    });
+      console.log('Enviando datos de clase:', submitData);
+      await onSubmit(submitData);
+    } catch (error) {
+      console.error('Error al crear clase:', error);
+      setErrors({ submit: 'Error al crear la clase. Inténtalo de nuevo.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field, value) => {
+    // Limpiar error específico cuando el usuario comience a escribir
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+
     setFormData(prev => {
       const newData = {
         ...prev,
         [field]: value
       };
 
-      // Si se cambia la fecha de inicio, actualizar automáticamente la fecha de fin
-      // para que sea 2 horas después
+      // Auto-actualizar fecha de fin cuando cambie la fecha de inicio
       if (field === 'fecha_inicio' && value) {
         try {
           const startDate = new Date(value);
@@ -116,9 +190,12 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
     
     return date.toLocaleDateString('es-CO', options);
   };
-    const todayMin = new Date();
-    todayMin.setHours(0, 0, 0, 0);
-  todayMin.setMinutes(0); // Asegurarse de que sea desde las 00:00 del día actual 
+
+  // Calcular fecha mínima (hoy)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMin = dateToLocalString(today);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -132,12 +209,19 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
           <button
             onClick={onCancel}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isSubmitting}
           >
             <X size={24} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {errors.submit && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {errors.submit}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -145,9 +229,12 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
               </label>
               <select
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  errors.profesora_id ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
                 value={formData.profesora_id}
                 onChange={(e) => handleChange('profesora_id', e.target.value)}
+                disabled={isSubmitting}
               >
                 <option value="">Seleccionar profesora</option>
                 {profesoras.map((profesora) => (
@@ -156,6 +243,9 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
                   </option>
                 ))}
               </select>
+              {errors.profesora_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.profesora_id}</p>
+              )}
             </div>
 
             <div className="md:col-span-2">
@@ -165,11 +255,17 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
               <input
                 type="text"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  errors.titulo ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
                 placeholder="Ej: Introducción a la Programación"
                 value={formData.titulo}
                 onChange={(e) => handleChange('titulo', e.target.value)}
+                disabled={isSubmitting}
               />
+              {errors.titulo && (
+                <p className="mt-1 text-sm text-red-600">{errors.titulo}</p>
+              )}
             </div>
 
             <div>
@@ -179,11 +275,17 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
               <input
                 type="datetime-local"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  errors.fecha_inicio ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
                 value={formData.fecha_inicio}
                 onChange={(e) => handleChange('fecha_inicio', e.target.value)}
-                min={todayMin.toISOString().slice(0, 16)} // ✅ hoy desde las 00:00
+                min={todayMin}
+                disabled={isSubmitting}
               />
+              {errors.fecha_inicio && (
+                <p className="mt-1 text-sm text-red-600">{errors.fecha_inicio}</p>
+              )}
             </div>
 
             <div>
@@ -193,11 +295,17 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
               <input
                 type="datetime-local"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  errors.fecha_fin ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
                 value={formData.fecha_fin}
                 onChange={(e) => handleChange('fecha_fin', e.target.value)}
-                min={formData.fecha_inicio} // La fecha de fin debe ser posterior a la de inicio
+                min={formData.fecha_inicio}
+                disabled={isSubmitting}
               />
+              {errors.fecha_fin && (
+                <p className="mt-1 text-sm text-red-600">{errors.fecha_fin}</p>
+              )}
             </div>
 
             <div className="md:col-span-2">
@@ -213,6 +321,7 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
                     checked={formData.ubicacion === 'Colegio'}
                     onChange={(e) => handleChange('ubicacion', e.target.value)}
                     className="mr-3 text-indigo-600 focus:ring-indigo-500"
+                    disabled={isSubmitting}
                   />
                   <div>
                     <span className="font-medium text-gray-900">Colegio</span>
@@ -228,6 +337,7 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
                     checked={formData.ubicacion === 'Centro TecnoAcademia'}
                     onChange={(e) => handleChange('ubicacion', e.target.value)}
                     className="mr-3 text-indigo-600 focus:ring-indigo-500"
+                    disabled={isSubmitting}
                   />
                   <div>
                     <span className="font-medium text-gray-900">Centro TecnoAcademia</span>
@@ -247,6 +357,7 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
                 placeholder="Descripción de la clase, objetivos, materiales necesarios..."
                 value={formData.descripcion}
                 onChange={(e) => handleChange('descripcion', e.target.value)}
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -256,15 +367,23 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
               type="button"
               onClick={onCancel}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              disabled={isSubmitting}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={!formData.profesora_id || !formData.titulo || !formData.fecha_inicio || !formData.fecha_fin}
+              disabled={isSubmitting || !formData.profesora_id || !formData.titulo || !formData.fecha_inicio || !formData.fecha_fin}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
-              Programar Clase
+              {isSubmitting ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {editingClase ? 'Actualizando...' : 'Programando...'}
+                </div>
+              ) : (
+                editingClase ? 'Actualizar Clase' : 'Programar Clase'
+              )}
             </button>
           </div>
         </form>
@@ -273,4 +392,4 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel }) => {
   );
 };
 
-export default ClaseForm;
+export default ClaseForm; 

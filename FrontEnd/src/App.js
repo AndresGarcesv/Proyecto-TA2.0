@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
-import AsistenciaList from './components/AsistenciaList';
+import ProfessorasManagement from './components/ProfessorasManagement';
+import AprendicesManagement from './components/AprendicesManagement';
 import Calendario from './components/Calendario';
 import Navbar from './components/Navbar';
 import AsistenciaModule from './components/AsistenciaModule';
@@ -56,7 +57,8 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Dashboard token={token} user={user} />} />
-       
+            <Route path="/profesoras" element={<ProfessorasManagement user={user} />} />
+            <Route path="/aprendices" element={<AprendicesManagement user={user} />} />
             <Route path="/calendario" element={<Calendario token={token} />} />
             <Route path="/asistencia" element={<AsistenciaModule token={token} />} />
             <Route path="*" element={<Navigate to="/" />} />

@@ -1,143 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Calendar, CheckCircle, XCircle, MapPin, Clock, AlertTriangle } from 'lucide-react';
-import { API_BASE_URL } from '../utils/api';
+import { getDashboardStats, authenticatedFetch } from '../utils/api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 const Dashboard = ({ user }) => {
   const [stats, setStats] = useState({
-    totalProfesoras: 0,
+    totalAprendices: 0,
     asistenciasHoy: 0,
     clasesHoy: 0,
-    proximasClases: []
+    proximasClases: [],
+    mes_actual: {
+      total_asistencias: 0,
+      presentes: 0,
+      ausentes: 0,
+      porcentaje_asistencia: 0
+    }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recentAsistencias, setRecentAsistencias] = useState([]);
 
-  // Recuperar token desde localStorage
-  const token = localStorage.getItem("token");
-
   useEffect(() => {
-    if (token) {
-      fetchDashboardData();
-    } else {
-      setError("No hay token de autenticación. Por favor, inicia sesión nuevamente.");
-      setLoading(false);
-    }
-  }, [token]);
+    fetchDashboardData();
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
       setError(null);
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-
-      console.log('Fetching data from:', API_BASE_URL);
+      console.log('Fetching dashboard data...');
       
-      // Verificar que la API esté disponible
-      let profesoras = [];
-      let asistencias = [];
-      let clases = [];
+      // Obtener estadísticas del dashboard
+      const dashboardStats = await getDashboardStats();
+      console.log('Dashboard stats received:', dashboardStats);
 
-      // Fetch Profesoras con manejo de errores individual
+      // Obtener asistencias recientes (últimas 5)
+      let recentAsistenciasData = [];
       try {
-        console.log('Fetching profesoras...');
-        const profesorasResponse = await fetch(`${API_BASE_URL}/profesoras`, { headers });
-        
-        if (!profesorasResponse.ok) {
-          throw new Error(`Profesoras: ${profesorasResponse.status} - ${profesorasResponse.statusText}`);
-        }
-        
-        profesoras = await profesorasResponse.json();
-        console.log('Profesoras obtenidas:', profesoras.length);
-      } catch (err) {
-        console.error('Error fetching profesoras:', err);
-        setError(prev => prev ? `${prev}\n• Error al cargar profesoras: ${err.message}` : `Error al cargar profesoras: ${err.message}`);
-      }
-
-      // Fetch Asistencias con manejo de errores individual
-      try {
-        console.log('Fetching asistencias...');
-        const asistenciasResponse = await fetch(`${API_BASE_URL}/asistencia`, { headers });
-        
-        if (!asistenciasResponse.ok) {
-          throw new Error(`Asistencias: ${asistenciasResponse.status} - ${asistenciasResponse.statusText}`);
-        }
-        
-        asistencias = await asistenciasResponse.json();
-        console.log('Asistencias obtenidas:', asistencias.length);
-      } catch (err) {
-        console.error('Error fetching asistencias:', err);
-        setError(prev => prev ? `${prev}\n• Error al cargar asistencias: ${err.message}` : `Error al cargar asistencias: ${err.message}`);
-      }
-
-      // Fetch Clases con manejo de errores individual
-      try {
-        console.log('Fetching clases...');
-        const hoy = new Date();
-        const mañana = new Date(hoy);
-        mañana.setDate(hoy.getDate() + 7);
-
-        const clasesResponse = await fetch(
-          `${API_BASE_URL}/clases?fecha_inicio=${hoy.toISOString()}&fecha_fin=${mañana.toISOString()}`,
-          { headers }
+        const recentResponse = await authenticatedFetch('/asistencia?fecha_inicio=' + 
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Últimos 30 días
         );
-        
-        if (!clasesResponse.ok) {
-          throw new Error(`Clases: ${clasesResponse.status} - ${clasesResponse.statusText}`);
+        if (recentResponse.ok) {
+          const allRecent = await recentResponse.json();
+          recentAsistenciasData = allRecent.slice(0, 5); // Tomar solo los primeros 5
         }
-        
-        clases = await clasesResponse.json();
-        console.log('Clases obtenidas:', clases.length);
-      } catch (err) {
-        console.error('Error fetching clases:', err);
-        setError(prev => prev ? `${prev}\n• Error al cargar clases: ${err.message}` : `Error al cargar clases: ${err.message}`);
+      } catch (asistenciasError) {
+        console.warn('Error fetching recent asistencias:', asistenciasError);
+        // No es crítico, continuar sin asistencias recientes
       }
 
-      // Calcular estadísticas con datos disponibles
+      // Procesar datos del dashboard
       const today = new Date().toISOString().split('T')[0];
-      
-      const asistenciasHoy = asistencias.filter(a => {
-        try {
-          return a.fecha && a.fecha.split('T')[0] === today;
-        } catch {
-          return false;
-        }
-      }).length;
-
-      const clasesHoy = clases.filter(c => {
-        try {
-          return c.fecha_inicio && c.fecha_inicio.split('T')[0] === today;
-        } catch {
-          return false;
-        }
+      const clasesHoy = (dashboardStats.clases_proximas || []).filter(clase => {
+        if (!clase.fecha_inicio) return false;
+        const claseDate = clase.fecha_inicio.split('T')[0];
+        return claseDate === today;
       }).length;
 
       setStats({
-        totalProfesoras: profesoras.length || 0,
-        asistenciasHoy,
+        totalAprendices: dashboardStats.totales?.aprendices || 0,
+        asistenciasHoy: dashboardStats.mes_actual?.total_asistencias || 0,
         clasesHoy,
-        proximasClases: clases.slice(0, 5) || []
+        proximasClases: dashboardStats.clases_proximas || [],
+        mes_actual: dashboardStats.mes_actual || {
+          total_asistencias: 0,
+          presentes: 0,
+          ausentes: 0,
+          porcentaje_asistencia: 0
+        }
       });
 
-      setRecentAsistencias(asistencias.slice(0, 5) || []);
+      setRecentAsistencias(recentAsistenciasData);
       
-      // Si llegamos aquí sin errores críticos, limpiamos el estado de error
-      if (!error) {
-        setError(null);
-      }
-      
-    } catch (error) {
-      console.error('Error general fetching dashboard data:', error);
-      setError(`Error general: ${error.message}`);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(`Error al cargar el dashboard: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Función para reintentar la carga
   const handleRetry = () => {
     setLoading(true);
     setError(null);
@@ -197,8 +138,8 @@ const Dashboard = ({ user }) => {
               <Users className="text-blue-600" size={24} />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Profesoras</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalProfesoras}</p>
+              <p className="text-sm font-medium text-gray-600">Total Aprendices</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalAprendices}</p>
             </div>
           </div>
         </div>
@@ -209,8 +150,11 @@ const Dashboard = ({ user }) => {
               <CheckCircle className="text-green-600" size={24} />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Asistencias Hoy</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.asistenciasHoy}</p>
+              <p className="text-sm font-medium text-gray-600">Asistencias Este Mes</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.mes_actual.total_asistencias}</p>
+              <p className="text-xs text-gray-500">
+                {stats.mes_actual.porcentaje_asistencia}% de asistencia
+              </p>
             </div>
           </div>
         </div>
@@ -236,6 +180,25 @@ const Dashboard = ({ user }) => {
               <p className="text-sm font-medium text-gray-600">Próximas Clases</p>
               <p className="text-2xl font-bold text-gray-900">{stats.proximasClases.length}</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumen mensual */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen del Mes Actual</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{stats.mes_actual.presentes}</div>
+            <div className="text-sm text-gray-600">Presentes</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">{stats.mes_actual.ausentes}</div>
+            <div className="text-sm text-gray-600">Ausentes</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-indigo-600">{stats.mes_actual.porcentaje_asistencia}%</div>
+            <div className="text-sm text-gray-600">% Asistencia</div>
           </div>
         </div>
       </div>
@@ -287,7 +250,7 @@ const Dashboard = ({ user }) => {
           </div>
           <div className="p-6">
             {recentAsistencias.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No hay registros de asistencia</p>
+              <p className="text-gray-500 text-center py-4">No hay registros de asistencia recientes</p>
             ) : (
               <div className="space-y-4">
                 {recentAsistencias.map((asistencia) => (
@@ -299,7 +262,7 @@ const Dashboard = ({ user }) => {
                         <XCircle className="text-red-500" size={20} />
                       )}
                       <div>
-                        <p className="font-medium text-gray-900">{asistencia.profesora?.nombre || 'Profesora desconocida'}</p>
+                        <p className="font-medium text-gray-900">{asistencia.aprendiz?.nombre || 'Aprendiz desconocido'}</p>
                         {asistencia.fecha && (
                           <p className="text-sm text-gray-600">{formatDate(asistencia.fecha)}</p>
                         )}
