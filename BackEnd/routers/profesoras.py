@@ -29,6 +29,28 @@ class ProfesoraCreate(BaseModel):
     password: str
     especialidad: str
 
+
+@router.get("/")
+async def listar_profesoras_admin(
+    current_admin: Profesora = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar todas las profesoras (incluye inactivas). Solo accesible por admin.
+    """
+    profesoras = db.query(Profesora).all()
+    result = []
+    for p in profesoras:
+        result.append({
+            "id": p.id,
+            "nombre": p.nombre,
+            "email": p.email,
+            "especialidad": p.especialidad,
+            "is_admin": getattr(p, 'is_admin', False),
+            "activa": getattr(p, 'activa', True)
+        })
+    return result
+
 # CRUD adicional para profesoras (solo admin)
 @router.put("/{profesora_id}")
 async def actualizar_profesora(

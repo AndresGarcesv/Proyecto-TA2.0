@@ -67,7 +67,9 @@ const ProfessorasManagement = ({ user }) => {
   const fetchProfesoras = async () => {
     try {
       setLoading(true);
-      const response = await authenticatedFetch('/profesoras');
+  // Si el usuario es admin, usamos el endpoint admin que devuelve todas (incluye inactivas)
+  const endpoint = user?.is_admin ? '/admin/profesoras' : '/profesoras';
+  const response = await authenticatedFetch(endpoint);
       if (response.ok) {
         const data = await response.json();
         setProfesoras(data);
@@ -177,6 +179,25 @@ const ProfessorasManagement = ({ user }) => {
     } catch (error) {
       console.error('Error deleting profesora:', error);
       alert('Error de conexión al eliminar');
+    }
+  };
+
+  const reactivarProfesora = async (profesoraId) => {
+    try {
+      const resp = await authenticatedFetch(`/admin/profesoras/${profesoraId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ activa: true })
+      });
+      if (resp.ok) {
+        await fetchProfesoras();
+        alert('Facilitadora reactivada exitosamente');
+      } else {
+        const err = await resp.json();
+        alert('Error al reactivar: ' + (err.detail || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error reactivando profesora:', error);
+      alert('Error de conexión al reactivar');
     }
   };
 
@@ -328,6 +349,15 @@ const ProfessorasManagement = ({ user }) => {
                         >
                           <Key size={16} />
                         </button>
+                        {!profesora.activa && profesora.id !== user.id && (
+                          <button
+                            onClick={() => reactivarProfesora(profesora.id)}
+                            className="text-green-600 hover:text-green-900 p-1"
+                            title="Reactivar facilitadora"
+                          >
+                            <Users size={16} />
+                          </button>
+                        )}
                         {profesora.id !== user.id && (
                           <button
                             onClick={() => handleDeleteProfesora(profesora)}
