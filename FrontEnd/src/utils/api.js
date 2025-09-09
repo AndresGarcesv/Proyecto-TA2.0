@@ -15,6 +15,13 @@ export const authenticatedFetch = async (endpoint, options = {}) => {
     ...options.headers
   };
 
+  // If there is a body and Content-Type wasn't provided and body is not FormData, set JSON
+  if (options.body && !(options.body instanceof FormData)) {
+    if (!Object.keys(headers).some(h => h.toLowerCase() === 'content-type')) {
+      headers['Content-Type'] = 'application/json';
+    }
+  }
+
   const config = {
     ...options,
     headers

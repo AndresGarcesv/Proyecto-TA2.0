@@ -123,7 +123,7 @@ const Dashboard = ({ user }) => {
           ¡Bienvenida, {user?.nombre || 'Usuario'}!
         </h1>
         <p className="text-indigo-100">
-          Especialidad en {user?.especialidad || 'No especificada'}
+          Linea de {user?.especialidad || 'No especificada'}
         </p>
         <p className="text-indigo-100 text-sm mt-2">
           {formatDate(new Date())}

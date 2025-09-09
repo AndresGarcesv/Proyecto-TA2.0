@@ -55,7 +55,7 @@ const LoginForm = ({ onLogin }) => {
             <User className="text-indigo-600" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">TecnoAcademia</h1>
-          <p className="text-gray-600">Sistema de Asistencia de Profesoras</p>
+          <p className="text-gray-600">Sistema de Asistencia de facilitadoras</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

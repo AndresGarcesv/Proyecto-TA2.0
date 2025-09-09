@@ -22,6 +22,13 @@ class ProfesoraUpdate(BaseModel):
 class ProfesoraPasswordUpdate(BaseModel):
     nueva_password: str
 
+
+class ProfesoraCreate(BaseModel):
+    nombre: str
+    email: str
+    password: str
+    especialidad: str
+
 # CRUD adicional para profesoras (solo admin)
 @router.put("/{profesora_id}")
 async def actualizar_profesora(
@@ -104,3 +111,33 @@ async def eliminar_profesora(
     db.commit()
     
     return {"message": "Profesora eliminada exitosamente"}
+
+
+@router.post("/")
+async def crear_profesora_admin(
+    profesora_data: ProfesoraCreate,
+    current_admin: Profesora = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    # Verificar si el email ya existe
+    existing = db.query(Profesora).filter(Profesora.email == profesora_data.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El email ya está registrado"
+        )
+
+    hashed = pwd_context.hash(profesora_data.password)
+    profesora = Profesora(
+        nombre=profesora_data.nombre,
+        email=profesora_data.email,
+        hashed_password=hashed,
+        especialidad=profesora_data.especialidad,
+        activa=True
+    )
+
+    db.add(profesora)
+    db.commit()
+    db.refresh(profesora)
+
+    return {"message": "Profesora creada exitosamente", "id": profesora.id}

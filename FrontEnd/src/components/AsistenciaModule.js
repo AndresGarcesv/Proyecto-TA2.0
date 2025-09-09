@@ -196,7 +196,7 @@ const AsistenciaModule = ({ token }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Lista de Asistencia</h1>
-          <p className="text-gray-600">Gestiona los registros de asistencia de las profesoras</p>
+          <p className="text-gray-600">Gestiona los registros de asistencia de las facilitadora</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -304,7 +304,7 @@ const AsistenciaModule = ({ token }) => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profesora</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Facilitadora</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aprendiz</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>

@@ -12,7 +12,7 @@ const navItems = [
   { path: '/asistencia', icon: Users, label: 'Asistencia' },
   { path: '/calendario', icon: Calendar, label: 'Calendario' },
   ...(user?.is_admin ? [
-    { path: '/profesoras', icon: Shield, label: 'Profesoras' },
+    { path: '/profesoras', icon: Shield, label: 'Facilitadoras' },
     { path: '/aprendices', icon: Users, label: 'Aprendices' }
   ] : [])
 ];

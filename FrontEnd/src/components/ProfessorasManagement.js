@@ -19,6 +19,46 @@ const ProfessorasManagement = ({ user }) => {
   });
   const [newPassword, setNewPassword] = useState('');
   const [errors, setErrors] = useState({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    nombre: '',
+    email: '',
+    especialidad: '',
+    password: '',
+    activa: true,
+    is_admin: false
+  });
+  const [createErrors, setCreateErrors] = useState({});
+
+  const submitCreate = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setCreateErrors({});
+
+    if (!createForm.password || createForm.password.length < 6) {
+      setCreateErrors({ password: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    try {
+      const response = await authenticatedFetch('/admin/profesoras', {
+        method: 'POST',
+        body: JSON.stringify(createForm)
+      });
+
+      if (response.ok) {
+        await fetchProfesoras();
+        setShowCreateModal(false);
+        setCreateForm({ nombre: '', email: '', especialidad: '', password: '', activa: true, is_admin: false });
+        alert('Facilitadora creada exitosamente');
+      } else {
+        const errorData = await response.json();
+        setCreateErrors({ general: errorData.detail || 'Error al crear facilitadora' });
+      }
+    } catch (error) {
+      console.error('Error creating profesora:', error);
+      setCreateErrors({ general: 'Error de conexión' });
+    }
+  };
 
   useEffect(() => {
     fetchProfesoras();
@@ -171,15 +211,15 @@ const ProfessorasManagement = ({ user }) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Profesoras</h1>
-          <p className="text-gray-600">Administra las profesoras del sistema</p>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de facilitadoras</h1>
+          <p className="text-gray-600">Administra las facilitadoras del sistema</p>
         </div>
         <button
-          onClick={() => window.location.href = '/register'} // Redirigir a página de registro
+          onClick={() => setShowCreateModal(true)}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 transition-colors"
         >
           <UserPlus size={20} />
-          Nueva Profesora
+          Nueva Facilitadora
         </button>
       </div>
 
@@ -189,7 +229,7 @@ const ProfessorasManagement = ({ user }) => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Buscar por nombre, email o especialidad..."
+            placeholder="Buscar por nombre, email o linea..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -201,16 +241,16 @@ const ProfessorasManagement = ({ user }) => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
-            Profesoras ({filteredProfesoras.length})
+            facilitadoras ({filteredProfesoras.length})
           </h3>
         </div>
 
         {filteredProfesoras.length === 0 ? (
           <div className="text-center py-12">
             <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron profesoras</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron facilitadoras</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm ? 'Intenta con otros términos de búsqueda.' : 'No hay profesoras registradas.'}
+              {searchTerm ? 'Intenta con otros términos de búsqueda.' : 'No hay facilitadoras registradas.'}
             </p>
           </div>
         ) : (
@@ -219,10 +259,10 @@ const ProfessorasManagement = ({ user }) => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Profesora
+                    Facilitadora
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Especialidad
+                    Linea
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
@@ -269,7 +309,7 @@ const ProfessorasManagement = ({ user }) => {
                           ? 'bg-purple-100 text-purple-800' 
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {profesora.is_admin ? 'Administrador' : 'Profesora'}
+                        {profesora.is_admin ? 'Administrador' : 'Facilitadora'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -277,7 +317,7 @@ const ProfessorasManagement = ({ user }) => {
                         <button
                           onClick={() => handleEditProfesora(profesora)}
                           className="text-indigo-600 hover:text-indigo-900 p-1"
-                          title="Editar profesora"
+                          title="Editar facilitadora"
                         >
                           <Edit size={16} />
                         </button>
@@ -292,7 +332,7 @@ const ProfessorasManagement = ({ user }) => {
                           <button
                             onClick={() => handleDeleteProfesora(profesora)}
                             className="text-red-600 hover:text-red-900 p-1"
-                            title="Eliminar profesora"
+                            title="Eliminar facilitadora"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -313,7 +353,7 @@ const ProfessorasManagement = ({ user }) => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Editar Profesora
+                Editar facilitadora
               </h3>
               
               {errors.general && (
@@ -351,7 +391,7 @@ const ProfessorasManagement = ({ user }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Especialidad
+                    Linea
                   </label>
                   <input
                     type="text"
@@ -397,6 +437,115 @@ const ProfessorasManagement = ({ user }) => {
                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
                   >
                     Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de creación */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Crear nueva facilitadora
+              </h3>
+
+              {createErrors.general && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {createErrors.general}
+                </div>
+              )}
+
+              <form onSubmit={submitCreate}
+                className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={createForm.nombre}
+                    onChange={(e) => setCreateForm({ ...createForm, nombre: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Linea</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={createForm.especialidad}
+                    onChange={(e) => setCreateForm({ ...createForm, especialidad: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  {createErrors.password && (
+                    <p className="mt-1 text-sm text-red-600">{createErrors.password}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                      checked={createForm.activa}
+                      onChange={(e) => setCreateForm({ ...createForm, activa: e.target.checked })}
+                    />
+                    <span className="text-sm text-gray-700">Activa</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                      checked={createForm.is_admin}
+                      onChange={(e) => setCreateForm({ ...createForm, is_admin: e.target.checked })}
+                    />
+                    <span className="text-sm text-gray-700">Administrador</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
+                  >
+                    Crear Facilitadora
                   </button>
                 </div>
               </form>

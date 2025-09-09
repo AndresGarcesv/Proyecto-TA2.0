@@ -227,7 +227,7 @@ const AprendicesManagement = ({ user }) => {
               value={selectedProfesora}
               onChange={(e) => setSelectedProfesora(e.target.value)}
             >
-              <option value="">Todas las profesoras</option>
+              <option value="">Todas las facilitadoras</option>
               {profesoras.map((profesora) => (
                 <option key={profesora.id} value={profesora.id}>
                   {profesora.nombre}
