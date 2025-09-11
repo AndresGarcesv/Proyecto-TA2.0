@@ -31,6 +31,31 @@ class AprendizResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+def serialize_aprendiz(aprendiz: Aprendiz) -> dict:
+    """Convertir instancia SQLAlchemy Aprendiz a dict listo para serializar por Pydantic/JSON."""
+    profesora_obj = None
+    try:
+        if hasattr(aprendiz, 'profesora') and aprendiz.profesora is not None:
+            profesora_obj = {
+                'id': aprendiz.profesora.id,
+                'nombre': aprendiz.profesora.nombre,
+                'email': getattr(aprendiz.profesora, 'email', None),
+                'especialidad': getattr(aprendiz.profesora, 'especialidad', None),
+                'is_admin': getattr(aprendiz.profesora, 'is_admin', False),
+                'activa': getattr(aprendiz.profesora, 'activa', True)
+            }
+    except Exception:
+        profesora_obj = None
+
+    return {
+        'id': aprendiz.id,
+        'nombre': aprendiz.nombre,
+        'documento': aprendiz.documento,
+        'profesora_id': aprendiz.profesora_id,
+        'profesora': profesora_obj
+    }
+
 # CRUD Endpoints para Aprendices
 @router.post("", response_model=AprendizResponse)
 async def crear_aprendiz(
@@ -59,8 +84,8 @@ async def crear_aprendiz(
     db.add(aprendiz)
     db.commit()
     db.refresh(aprendiz)
-    
-    return AprendizResponse.model_validate(aprendiz)
+
+    return serialize_aprendiz(aprendiz)
 
 @router.get("", response_model=List[AprendizResponse])
 async def get_aprendices(
@@ -77,7 +102,7 @@ async def get_aprendices(
         query = query.filter(Aprendiz.profesora_id == profesora_id)
     
     aprendices = query.all()
-    return [AprendizResponse.model_validate(a) for a in aprendices]
+    return [serialize_aprendiz(a) for a in aprendices]
 
 @router.get("/{aprendiz_id}", response_model=AprendizResponse)
 async def get_aprendiz(
@@ -100,7 +125,7 @@ async def get_aprendiz(
             detail="No tienes permisos para ver este aprendiz"
         )
     
-    return AprendizResponse.model_validate(aprendiz)
+    return serialize_aprendiz(aprendiz)
 
 @router.put("/{aprendiz_id}", response_model=AprendizResponse)
 async def actualizar_aprendiz(
@@ -131,8 +156,8 @@ async def actualizar_aprendiz(
     
     db.commit()
     db.refresh(aprendiz)
-    
-    return AprendizResponse.model_validate(aprendiz)
+
+    return serialize_aprendiz(aprendiz)
 
 @router.delete("/{aprendiz_id}")
 async def eliminar_aprendiz(

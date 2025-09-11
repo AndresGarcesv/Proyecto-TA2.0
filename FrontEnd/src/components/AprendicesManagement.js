@@ -28,10 +28,21 @@ const AprendicesManagement = ({ user }) => {
     try {
       setLoading(true);
       const endpoint = selectedProfesora ? `/aprendices?profesora_id=${selectedProfesora}` : '/aprendices';
+      // Debug: mostrar el usuario actual y endpoint
+      console.log('DEBUG: fetchAprendices user=', user, 'endpoint=', endpoint);
       const response = await authenticatedFetch(endpoint);
+      console.log('DEBUG: fetchAprendices response status=', response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log('DEBUG: aprendices data=', data);
         setAprendices(data);
+      } else {
+        try {
+          const err = await response.json();
+          console.error('Error fetching aprendices:', err);
+        } catch (e) {
+          console.error('Error fetching aprendices: status', response.status);
+        }
       }
     } catch (error) {
       console.error('Error fetching aprendices:', error);
@@ -42,7 +53,9 @@ const AprendicesManagement = ({ user }) => {
 
   const fetchProfesoras = async () => {
     try {
-      const response = await authenticatedFetch('/profesoras');
+      // Usar el endpoint admin cuando el usuario es admin para incluir al administrador
+      const endpoint = user?.is_admin ? '/admin/profesoras' : '/profesoras';
+      const response = await authenticatedFetch(endpoint);
       if (response.ok) {
         const data = await response.json();
         setProfesoras(data);
@@ -317,13 +330,7 @@ const AprendicesManagement = ({ user }) => {
                               </button>
                             </>
                           )}
-                          <button
-                            onClick={() => window.location.href = `/asistencia/detalle/${aprendiz.id}`}
-                            className="text-green-600 hover:text-green-900 p-1"
-                            title="Ver asistencias"
-                          >
-                            <FileText size={16} />
-                          </button>
+                          {/* Botón 'Ver asistencias' eliminado según solicitud */}
                         </div>
                       </td>
                     </tr>
