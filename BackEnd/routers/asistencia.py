@@ -147,7 +147,18 @@ def crear_asistencia(
         existing.presente = asistencia_data.presente
         db.commit()
         db.refresh(existing)
-        return AsistenciaResponse.model_validate(existing)
+        return {
+            "id": existing.id,
+            "aprendiz_id": existing.aprendiz_id,
+            "fecha": existing.fecha,
+            "presente": existing.presente,
+            "profesora_id": existing.profesora_id,
+            "aprendiz": {
+                "id": existing.aprendiz.id,
+                "nombre": existing.aprendiz.nombre,
+                "documento": existing.aprendiz.documento
+            }
+        }
     
     # Crear nueva asistencia
     asistencia = Asistencia(
@@ -161,7 +172,18 @@ def crear_asistencia(
     db.commit()
     db.refresh(asistencia)
     
-    return AsistenciaResponse.model_validate(asistencia)
+    return {
+        "id": asistencia.id,
+        "aprendiz_id": asistencia.aprendiz_id,
+        "fecha": asistencia.fecha,
+        "presente": asistencia.presente,
+        "profesora_id": asistencia.profesora_id,
+        "aprendiz": {
+            "id": asistencia.aprendiz.id,
+            "nombre": asistencia.aprendiz.nombre,
+            "documento": asistencia.aprendiz.documento
+        }
+    }
 
 @router.post("/masiva")
 def crear_asistencia_masiva(
