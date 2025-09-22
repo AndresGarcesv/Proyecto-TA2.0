@@ -3,7 +3,6 @@ import { Plus, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
 import AsistenciaForm from './AsistenciaForm';
-import AsistenciaModule from './AsistenciaModule';
 
 
 const AsistenciaList = ({ token }) => {
@@ -127,7 +126,7 @@ const AsistenciaList = ({ token }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Lista de Asistencia</h1>
-          <p className="text-gray-600">Gestiona los registros de asistencia de las profesoras</p>
+          <p className="text-gray-600">Gestiona los registros de asistencia de las facilitadoras</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -147,7 +146,7 @@ const AsistenciaList = ({ token }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Profesora
+              Facilitadora
             </label>
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -244,10 +243,13 @@ const AsistenciaList = ({ token }) => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Profesora
+                    Facilitadora
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Presente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
@@ -279,6 +281,33 @@ const AsistenciaList = ({ token }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(asistencia.fecha)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="checkbox"
+                        checked={asistencia.presente}
+                        onChange={async (e) => {
+                          const nuevoEstado = e.target.checked;
+                          try {
+                            const response = await fetch(`${API_BASE_URL}/asistencia/${asistencia.id}`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({ presente: nuevoEstado }),
+                            });
+                            if (response.ok) {
+                              fetchAsistencias();
+                            } else {
+                              alert('Error al actualizar asistencia');
+                            }
+                          } catch (error) {
+                            alert('Error de conexión al actualizar asistencia');
+                          }
+                        }}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

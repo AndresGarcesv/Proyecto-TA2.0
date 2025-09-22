@@ -3,6 +3,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 import os
 from urllib.parse import quote_plus
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Configuración de MySQL
 MYSQL_USER = os.getenv("MYSQL_USER", "root")

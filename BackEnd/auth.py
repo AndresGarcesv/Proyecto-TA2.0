@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Profesora
 from passlib.context import CryptContext
+import secrets
+
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY or SECRET_KEY == 'change_this_in_production':
+    SECRET_KEY = secrets.token_urlsafe(32)
+    print("⚠️  ADVERTENCIA: Usando SECRET_KEY generada. Define SECRET_KEY en .env para producción")
 
 # Configuración desde .env
 SECRET_KEY = os.getenv('SECRET_KEY', 'change_this_in_production')

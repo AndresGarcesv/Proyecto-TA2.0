@@ -1,28 +1,61 @@
-# startup_admin.py - crea admin inicial si no existe y escribe credenciales en admin_credentials.txt
-import os, random, string
+import os
 from sqlalchemy.orm import Session
-from database import get_db, engine
-from models import Profesora, Base
-from auth import get_password_hash
+from database import SessionLocal, test_connection
+from models import Profesora
+from passlib.context import CryptContext
+from dotenv import load_dotenv
+
+load_dotenv()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def ensure_admin():
-    # create tables if not exist
-    Base.metadata.create_all(bind=engine)
-    db = next(get_db())
+    """Crear usuario admin por defecto si no existe"""
+    
+    # Verificar conexión a la base de datos
+    if not test_connection():
+        print("❌ No se pudo conectar a la base de datos")
+        return False
+    
+    db = SessionLocal()
     try:
-        admin = db.query(Profesora).filter(Profesora.email == 'admin@local').first()
-        if admin:
-            return None
-        # generar contraseña aleatoria
-        pwd = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(12))
-        hashed = get_password_hash(pwd)
-        admin = Profesora(nombre='Admin', email='admin@local', hashed_password=hashed, especialidad='Admin', is_admin=True)
-        db.add(admin)
-        db.commit()
-        # escribir credenciales en archivo local (no subir a repo en producción)
-        with open(os.path.join(os.path.dirname(__file__), 'admin_credentials.txt'), 'w', encoding='utf-8') as f:
-            f.write(f'email=admin@local\npassword={pwd}\n')
-        return pwd
+        # Buscar si ya existe un admin
+        admin_exists = db.query(Profesora).filter(Profesora.is_admin == True).first()
+        
+        if not admin_exists:
+            # Crear admin por defecto
+            admin_email = os.getenv("ADMIN_EMAIL", "admin@tecnoacademia.com")
+            admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+            admin_name = os.getenv("ADMIN_NAME", "Administrador")
+            
+            hashed_password = pwd_context.hash(admin_password)
+            
+            admin_user = Profesora(
+                nombre=admin_name,
+                email=admin_email,
+                hashed_password=hashed_password,
+                especialidad="Administración",
+                is_admin=True,
+                activa=True
+            )
+            
+            db.add(admin_user)
+            db.commit()
+            
+            print(f"✅ Usuario admin creado:")
+            print(f"   Email: {admin_email}")
+            print(f"   Password: {admin_password}")
+            print(f"   ⚠️  CAMBIA LA CONTRASEÑA EN PRODUCCIÓN")
+        else:
+            print(f"✅ Usuario admin ya existe: {admin_exists.email}")
+            
+        return True
+        
     except Exception as e:
-        db.rollback()
-        return None
+        print(f"❌ Error creando admin: {e}")
+        return False
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    ensure_admin()

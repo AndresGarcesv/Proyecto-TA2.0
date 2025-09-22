@@ -18,8 +18,7 @@ const LoginForm = ({ onLogin }) => {
     try {
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: {'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
       });
@@ -56,7 +55,7 @@ const LoginForm = ({ onLogin }) => {
             <User className="text-indigo-600" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">TecnoAcademia</h1>
-          <p className="text-gray-600">Sistema de Asistencia de Profesoras</p>
+          <p className="text-gray-600">Sistema de Asistencia de facilitadoras</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -72,7 +71,7 @@ const LoginForm = ({ onLogin }) => {
                 type="email"
                 required
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="profesora@tecnoacademia.edu.co"
+                placeholder="Facilitadora@tecnoacademia.edu.co"
                 value={formData.email}
                 onChange={handleChange}
               />

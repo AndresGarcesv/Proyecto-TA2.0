@@ -10,11 +10,11 @@ const api = axios.create({
 
 export async function importarExcel(file, nombre_lista){
   const fd = new FormData();
+  // El backend espera el campo 'archivo'
   fd.append("archivo", file);
   fd.append("nombre_lista", nombre_lista || "Importada desde Front");
-  const res = await api.post("/asistencia/importar/", fd, {
-    headers: { "Content-Type": "multipart/form-data" }
-  });
+  // No forzamos Content-Type: el navegador lo define (boundary)
+  const res = await api.post("/asistencia/importar/", fd);
   return res.data;
 }
 
