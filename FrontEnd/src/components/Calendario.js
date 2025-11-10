@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, User, Edit, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
-import { 
-  formatDateTime, 
-  formatDateRange, 
-  calculateDuration,
-  getCalendarDays,
-  parseBackendDate,
-  getCurrentColombiaDate,
-  isToday
-  , formatTime
-} from '../utils/dateUtils';
+import { formatDateTime, formatDateRange, calculateDuration,getCalendarDays,parseBackendDate,getCurrentColombiaDate, isToday, formatTime} from '../utils/dateUtils';
 import ClaseForm from './ClaseForm';
 
 const Calendario = ({ token, user }) => {
@@ -23,6 +14,7 @@ const Calendario = ({ token, user }) => {
   const [editingClase, setEditingClase] = useState(null);
   const [selectedClase, setSelectedClase] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showClassDetail, setShowClassDetail] = useState(false);
 
   const meses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -107,6 +99,7 @@ const Calendario = ({ token, user }) => {
 
       if (response.ok) {
         await fetchClases();
+  // Modal para ver detalle de clase y acciones (editar / eliminar)
         setShowForm(false);
         setSelectedDate(null);
         setEditingClase(null);
@@ -225,6 +218,66 @@ const Calendario = ({ token, user }) => {
     </div>
   );
 
+  // Modal para ver detalle de clase y acciones (editar / eliminar)
+  const ClassDetailModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+        <div className="p-6 border-b flex justify-between items-start">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">{selectedClase?.titulo}</h3>
+            <p className="text-sm text-gray-600">{selectedClase?.profesora?.nombre} - {selectedClase?.profesora?.especialidad}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Abrir el formulario en modo edición
+                setEditingClase(selectedClase);
+                setShowClassDetail(false);
+                setShowForm(true);
+              }}
+              className="p-2 text-gray-600 hover:text-indigo-600"
+              title="Editar clase"
+            >
+              <Edit size={18} />
+            </button>
+            <button
+              onClick={() => {
+                setShowClassDetail(false);
+                setShowDeleteModal(true);
+              }}
+              className="p-2 text-gray-600 hover:text-red-600"
+              title="Eliminar clase"
+            >
+              <Trash2 size={18} />
+            </button>
+            <button
+              onClick={() => {
+                setShowClassDetail(false);
+                setSelectedClase(null);
+              }}
+              className="ml-2 px-3 py-1 bg-gray-100 rounded"
+            >Cerrar</button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-3">
+          <div className="text-sm text-gray-700">
+            <strong>Fecha:</strong> {selectedClase?.fecha_inicio && formatDateRange(selectedClase.fecha_inicio, selectedClase.fecha_fin)}
+          </div>
+          <div className="text-sm text-gray-700">
+            <strong>Ubicación:</strong> {selectedClase?.ubicacion}
+          </div>
+          {selectedClase?.descripcion && (
+            <div className="text-sm text-gray-700">
+              <strong>Descripción:</strong>
+              <p className="mt-1 text-gray-600">{selectedClase.descripcion}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -321,7 +374,9 @@ const Calendario = ({ token, user }) => {
                       title={`${clase.titulo} - ${clase.profesora.nombre} - ${formatDateTime(clase.fecha_inicio)}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Aquí podrías abrir un modal con detalles de la clase
+                        // Abrir modal de detalle para ver/editar/eliminar
+                        setSelectedClase(clase);
+                        setShowClassDetail(true);
                       }}
                     >
                       <div className="font-medium">{clase.titulo}</div>
@@ -485,7 +540,8 @@ const Calendario = ({ token, user }) => {
       )}
 
       {/* Modal de confirmación de eliminación */}
-      {showDeleteModal && <DeleteConfirmModal />}
+  {showClassDetail && <ClassDetailModal />}
+  {showDeleteModal && <DeleteConfirmModal />}
     </div>
   );
 };

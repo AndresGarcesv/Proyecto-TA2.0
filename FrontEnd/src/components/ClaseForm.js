@@ -340,8 +340,8 @@ const ClaseForm = ({ profesoras, selectedDate, onSubmit, onCancel, user, editing
                     disabled={isSubmitting}
                   />
                   <div>
-                    <span className="font-medium text-gray-900">Centro TecnoAcademia</span>
-                    <p className="text-sm text-gray-500">Formación en el centro tecnológico</p>
+                    <span className="font-medium text-gray-900">TecnoAcademia</span>
+                    <p className="text-sm text-gray-500">Formación en tecnológico</p>
                   </div>
                 </label>
               </div>

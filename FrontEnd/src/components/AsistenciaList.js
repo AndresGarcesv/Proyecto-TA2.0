@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
-import { API_BASE_URL } from '../utils/api';
+import { API_BASE_URL, authenticatedFetch } from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
 import AsistenciaForm from './AsistenciaForm';
 
 
-const AsistenciaList = ({ token }) => {
+const AsistenciaList = () => {
   const [asistencias, setAsistencias] = useState([]);
   const [profesoras, setProfesoras] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,9 @@ const AsistenciaList = ({ token }) => {
     fecha_fin: '',
     presente: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizeOptions = [5, 10, 20, 50];
 
   useEffect(() => {
     fetchAsistencias();
@@ -26,6 +29,11 @@ const AsistenciaList = ({ token }) => {
     fetchAsistencias();
   }, [filters]);
 
+  // Reset page when data or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [asistencias.length, pageSize]);
+
   const fetchAsistencias = async () => {
     try {
       const params = new URLSearchParams();
@@ -33,11 +41,7 @@ const AsistenciaList = ({ token }) => {
       if (filters.fecha_inicio) params.append('fecha_inicio', filters.fecha_inicio);
       if (filters.fecha_fin) params.append('fecha_fin', filters.fecha_fin);
 
-      const response = await fetch(`${API_BASE_URL}/asistencia?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await authenticatedFetch(`/asistencia?${params}`);
 
       if (response.ok) {
         let data = await response.json();
@@ -58,11 +62,7 @@ const AsistenciaList = ({ token }) => {
 
   const fetchProfesoras = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/profesoras`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await authenticatedFetch('/profesoras');
       if (response.ok) {
         const data = await response.json();
         setProfesoras(data);
@@ -74,12 +74,8 @@ const AsistenciaList = ({ token }) => {
 
   const handleCreateAsistencia = async (asistenciaData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/asistencia`, {
+      const response = await authenticatedFetch('/asistencia', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify(asistenciaData),
       });
 
@@ -239,6 +235,68 @@ const AsistenciaList = ({ token }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Resumen compacto + controles de paginación */}
+            <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-gray-50 px-4 py-2 rounded-md">
+                  <div className="text-xs text-gray-500">Registros</div>
+                  <div className="text-lg font-semibold text-gray-900">{asistencias.length}</div>
+                </div>
+                <div className="bg-green-50 px-4 py-2 rounded-md">
+                  <div className="text-xs text-green-600">Presentes</div>
+                  <div className="text-lg font-semibold text-green-700">{asistencias.filter(a => a.presente).length}</div>
+                </div>
+                <div className="bg-red-50 px-4 py-2 rounded-md">
+                  <div className="text-xs text-red-600">Ausentes</div>
+                  <div className="text-lg font-semibold text-red-700">{asistencias.filter(a => !a.presente).length}</div>
+                </div>
+                <div className="bg-white px-4 py-2 rounded-md text-sm text-gray-600">
+                  {filters.fecha_inicio || filters.fecha_fin ? (
+                    <>
+                      <div>Rango:</div>
+                      <div className="font-medium text-gray-900">{filters.fecha_inicio || '...'} — {filters.fecha_fin || '...'}</div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500">Rango: todos</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-600">Mostrar</div>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  className="px-2 py-1 border rounded-md"
+                >
+                  {pageSizeOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                <div className="text-sm text-gray-600">|</div>
+
+                <PaginationInfo
+                  total={asistencias.length}
+                  currentPage={currentPage}
+                  pageSize={pageSize}
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200"
+                    disabled={currentPage === 1}
+                  >Anterior</button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(asistencias.length / pageSize) || 1, p + 1))}
+                    className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200"
+                    disabled={currentPage >= Math.ceil(asistencias.length / pageSize)}
+                  >Siguiente</button>
+                </div>
+              </div>
+            </div>
+
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -260,7 +318,8 @@ const AsistenciaList = ({ token }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {asistencias.map((asistencia) => (
+                {/** Paginación cliente */}
+                {getPaginated(asistencias, currentPage, pageSize).map((asistencia) => (
                   <tr key={asistencia.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -289,12 +348,8 @@ const AsistenciaList = ({ token }) => {
                         onChange={async (e) => {
                           const nuevoEstado = e.target.checked;
                           try {
-                            const response = await fetch(`${API_BASE_URL}/asistencia/${asistencia.id}`, {
+                            const response = await authenticatedFetch(`/asistencia/${asistencia.id}`, {
                               method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`,
-                              },
                               body: JSON.stringify({ presente: nuevoEstado }),
                             });
                             if (response.ok) {
@@ -345,5 +400,24 @@ const AsistenciaList = ({ token }) => {
     </div>
   );
 };
+
+// Helper: returns page slice
+function getPaginated(items, currentPage, pageSize) {
+  const total = items.length;
+  const start = (currentPage - 1) * pageSize;
+  if (start >= total) return [];
+  return items.slice(start, start + pageSize);
+}
+
+function PaginationInfo({ total, currentPage, pageSize }) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(total, currentPage * pageSize);
+  return (
+    <div className="text-sm text-gray-600">
+      Mostrando {start}-{end} de {total} (pág. {currentPage}/{totalPages})
+    </div>
+  );
+}
 
 export default AsistenciaList;

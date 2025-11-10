@@ -121,7 +121,7 @@ const LoginForm = ({ onLogin }) => {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            ¿No tienes cuenta? Contacta al administrador
+            ¿No tienes cuenta? Contacta al dinamizador de TecnoAcademia.
           </p>
         </div>
       </div>

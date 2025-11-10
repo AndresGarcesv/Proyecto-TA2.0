@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
 import { authenticatedFetch } from '../utils/api';
 import { formatDate } from '../utils/dateUtils';
@@ -16,23 +16,42 @@ const AsistenciaModule = ({ token }) => {
     fecha_fin: '',
     presente: ''
   });
+  
+  // Estado local para las fechas antes de aplicar el filtro
+  const [tempDates, setTempDates] = useState({
+    fecha_inicio: '',
+    fecha_fin: ''
+  });
 
-  // Estado para módulo AsistenciaModule
-  const [aprendices, setAprendices] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [detalle, setDetalle] = useState(null);
+  // Paginación y vista
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20); // mostrar 20 por página por defecto
+  const pageSizeOptions = [10, 20, 50];
+
+  // Debounce para las fechas
+  const [dateTimeout, setDateTimeout] = useState(null);
+
   const [file, setFile] = useState(null);
   const [nombreLista, setNombreLista] = useState("");
 
   useEffect(() => {
     fetchAsistencias();
     fetchProfesoras();
-    cargarResumen();
   }, []);
 
+  // Re-fetch when filters change and reset page
   useEffect(() => {
+    setCurrentPage(1);
     fetchAsistencias();
-  }, [filters]);
+  }, [filters, pageSize]);
+
+  // Ajustar currentPage si queda fuera de rango cuando cambia el total de páginas
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(asistencias.length / pageSize));
+    if (currentPage > pages) {
+      setCurrentPage(pages);
+    }
+  }, [asistencias.length, pageSize, currentPage]);
 
   const fetchAsistencias = async () => {
     try {
@@ -40,11 +59,27 @@ const AsistenciaModule = ({ token }) => {
       const data = await asistenciaService.obtenerAsistencias(filters);
       
       // Aplicar filtro de presente si está definido
-      let filteredData = data;
+      let filteredData = data || [];
       if (filters.presente !== '') {
-        filteredData = data.filter(a => a.presente === (filters.presente === 'true'));
+        filteredData = filteredData.filter(a => a.presente === (filters.presente === 'true'));
       }
-      
+
+      // Ordenar primero por fecha y luego por nombre de aprendiz
+      filteredData.sort((a, b) => {
+        // Primero ordenar por fecha
+        const fechaA = new Date(a.fecha || 0);
+        const fechaB = new Date(b.fecha || 0);
+        if (fechaA.getTime() !== fechaB.getTime()) {
+          return fechaA - fechaB;
+        }
+        
+        // Si las fechas son iguales, ordenar por nombre de aprendiz
+        const nombreA = (a.aprendiz?.nombre || '').toLowerCase();
+        const nombreB = (b.aprendiz?.nombre || '').toLowerCase();
+        return nombreA.localeCompare(nombreB);
+      });
+
+      // Guardar todas las asistencias filtradas para paginación en cliente
       setAsistencias(filteredData);
     } catch (error) {
       console.error('Error fetching asistencias:', error);
@@ -78,12 +113,47 @@ const AsistenciaModule = ({ token }) => {
     }
   };
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  // Función para validar fechas
+  const isValidDate = (dateStr) => {
+    if (!dateStr) return true;
+    const date = new Date(dateStr);
+    return date instanceof Date && !isNaN(date);
   };
+
+  // Manejador de cambios en filtros con debounce para fechas
+  const handleFilterChange = useCallback((field, value) => {
+    // Si el campo es una fecha, actualizamos el estado temporal
+    if (field.includes('fecha_')) {
+      setTempDates(prev => ({
+        ...prev,
+        [field]: value
+      }));
+
+      // Limpiar timeout anterior si existe
+      if (dateTimeout) {
+        clearTimeout(dateTimeout);
+      }
+
+      // Crear nuevo timeout para aplicar el filtro
+      const newTimeout = setTimeout(() => {
+        // Validar la fecha antes de aplicar el filtro
+        if (isValidDate(value)) {
+          setFilters(prev => ({
+            ...prev,
+            [field]: value
+          }));
+        }
+      }, 500); // 500ms de delay
+
+      setDateTimeout(newTimeout);
+    } else {
+      // Para otros campos, actualizar inmediatamente
+      setFilters(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+  }, [dateTimeout]);
 
   const clearFilters = () => {
     setFilters({
@@ -92,45 +162,11 @@ const AsistenciaModule = ({ token }) => {
       fecha_fin: '',
       presente: ''
     });
+    setTempDates({
+      fecha_inicio: '',
+      fecha_fin: ''
+    });
   };
-
-  // ---- Lógica módulo AsistenciaModule ----
-  async function cargarResumen() {
-    try {
-      const res = await asistenciaService.obtenerResumen();
-      setAprendices(res || []);
-    } catch (e) {
-      console.error(e);
-      alert("Error cargando resumen de aprendices: " + e.message);
-    }
-  }
-
-  async function verDetalle(id) {
-    setSelected(id);
-    try {
-      const d = await asistenciaService.detalleAprendiz(id);
-      setDetalle(d);
-    } catch (e) {
-      console.error(e);
-      alert("Error al cargar detalle: " + e.message);
-    }
-  }
-
-  async function onToggle(aprendizId, fechaIso, current) {
-    try {
-      await asistenciaService.toggleAsistencia(aprendizId, fechaIso, !current);
-      setDetalle(prev => {
-        if (!prev) return prev;
-        const copy = JSON.parse(JSON.stringify(prev));
-        copy.asistencias[fechaIso] = !current;
-        return copy;
-      });
-      setAprendices(prev => prev.map(p => p.id === aprendizId ? { ...p, total: p.total + (current ? -1 : 1) } : p));
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo actualizar asistencia: " + e.message);
-    }
-  }
 
   async function handleImport(e) {
     e.preventDefault();
@@ -140,7 +176,7 @@ const AsistenciaModule = ({ token }) => {
       alert("Importado correctamente");
       setFile(null);
       setNombreLista("");
-      cargarResumen();
+      fetchAsistencias(); // Actualizar la lista después de importar
     } catch (e) {
       console.error(e);
       alert("Error al importar: " + e.message);
@@ -190,6 +226,13 @@ const AsistenciaModule = ({ token }) => {
     );
   }
 
+  // Cálculos de paginación
+  const total = asistencias.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(total, currentPage * pageSize);
+  const paginated = asistencias.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -234,9 +277,13 @@ const AsistenciaModule = ({ token }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
             <input
               type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={filters.fecha_inicio}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                tempDates.fecha_inicio && !isValidDate(tempDates.fecha_inicio) ? 'border-red-500' : 'border-gray-300'
+              }`}
+              value={tempDates.fecha_inicio}
               onChange={(e) => handleFilterChange('fecha_inicio', e.target.value)}
+              min={`${new Date().getFullYear()}-01-01`}
+              max={`${new Date().getFullYear()}-12-31`}
             />
           </div>
 
@@ -244,9 +291,13 @@ const AsistenciaModule = ({ token }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
             <input
               type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={filters.fecha_fin}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                tempDates.fecha_fin && !isValidDate(tempDates.fecha_fin) ? 'border-red-500' : 'border-gray-300'
+              }`}
+              value={tempDates.fecha_fin}
               onChange={(e) => handleFilterChange('fecha_fin', e.target.value)}
+              min={tempDates.fecha_inicio || `${new Date().getFullYear()}-01-01`}
+              max={`${new Date().getFullYear()}-12-31`}
             />
           </div>
 
@@ -283,12 +334,51 @@ const AsistenciaModule = ({ token }) => {
         />
       )}
 
-      {/* Tabla de asistencias */}
+      {/* Resumen compacto + tabla de asistencias con paginación */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            Registros de Asistencia ({asistencias.length})
-          </h3>
+        <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-gray-50 px-4 py-2 rounded-md">
+              <div className="text-xs text-gray-500">Registros</div>
+              <div className="text-lg font-semibold text-gray-900">{total}</div>
+            </div>
+            <div className="bg-green-50 px-4 py-2 rounded-md">
+              <div className="text-xs text-green-600">Presentes</div>
+              <div className="text-lg font-semibold text-green-700">{asistencias.filter(a => a.presente).length}</div>
+            </div>
+            <div className="bg-red-50 px-4 py-2 rounded-md">
+              <div className="text-xs text-red-600">Ausentes</div>
+              <div className="text-lg font-semibold text-red-700">{asistencias.filter(a => !a.presente).length}</div>
+            </div>
+            <div className="bg-white px-4 py-2 rounded-md text-sm text-gray-600">
+              {filters.fecha_inicio || filters.fecha_fin ? (
+                <>
+                  <div>Rango:</div>
+                  <div className="font-medium text-gray-900">{filters.fecha_inicio || '...'} — {filters.fecha_fin || '...'}</div>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500">Rango: todos</div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600">Mostrar</div>
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="px-2 py-1 border rounded-md">
+              {pageSizeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+
+            <div className="text-sm text-gray-600">|</div>
+
+            <div className="text-sm text-gray-600">
+              Mostrando {startIndex+1}-{endIndex} de {total} (pág. {currentPage}/{totalPages})
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200" disabled={currentPage === 1}>Anterior</button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200" disabled={currentPage >= totalPages}>Siguiente</button>
+            </div>
+          </div>
         </div>
 
         {asistencias.length === 0 ? (
@@ -304,90 +394,93 @@ const AsistenciaModule = ({ token }) => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Facilitadora</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aprendiz</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {asistencias.map((asistencia) => (
-                  <tr key={asistencia.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="bg-indigo-100 h-10 w-10 rounded-full flex items-center justify-center">
-                          <span className="text-indigo-600 font-medium text-sm">
-                            {getNombreSeguro(asistencia.profesora, 'P').charAt(0)}
-                          </span>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {getNombreSeguro(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {getEspecialidadSegura(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {getNombreSeguro(asistencia.aprendiz)}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {asistencia.aprendiz?.documento || 'Sin documento'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {asistencia.fecha ? formatDate(asistencia.fecha) : 'Sin fecha'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {/* Checkbox para marcar presente/ausente en la fila */}
-                        <input
-                          type="checkbox"
-                          className="mr-3 h-4 w-4"
-                          checked={!!asistencia.presente}
-                          onChange={async () => {
-                            // Llamar al servicio para togglear y actualizar estado local
-                            try {
-                              await asistenciaService.toggleAsistencia(asistencia.aprendiz_id || asistencia.aprendiz?.id, asistencia.fecha, !asistencia.presente);
-                              // Actualizar lista de asistencias
-                              setAsistencias(prev => prev.map(a => a.id === asistencia.id ? { ...a, presente: !a.presente } : a));
-                              // Actualizar resumen de aprendices si corresponde
-                              setAprendices(prev => prev.map(p => {
-                                if (p.id === (asistencia.aprendiz_id || asistencia.aprendiz?.id)) {
-                                  const delta = asistencia.presente ? -1 : 1;
-                                  return { ...p, total: (p.total || 0) + delta };
-                                }
-                                return p;
-                              }));
-                            } catch (e) {
-                              console.error('Error toggling asistencia row:', e);
-                              alert('No se pudo actualizar asistencia: ' + (e.message || e));
-                            }
-                          }}
-                        />
+                {paginated.map((asistencia, index) => {
+                  const currentDate = new Date(asistencia.fecha);
+                  const prevDate = index > 0 ? new Date(paginated[index - 1].fecha) : null;
+                  const isNewDate = !prevDate || currentDate.getTime() !== prevDate.getTime();
 
-                        {asistencia.presente ? (
-                          <>
-                            <CheckCircle className="text-green-500 mr-2" size={20} />
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              Presente
+                  return [
+                    isNewDate && (
+                      <tr key={`header-${asistencia.id}`}>
+                        <td colSpan="4" className="bg-gray-50 px-6 py-2 border-t border-b border-gray-200">
+                          <div className="text-sm font-semibold text-gray-700">
+                            {asistencia.fecha ? formatDate(asistencia.fecha) : 'Sin fecha'}
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                    <tr key={`row-${asistencia.id}`} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {asistencia.fecha ? formatDate(asistencia.fecha) : 'Sin fecha'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="bg-indigo-100 h-10 w-10 rounded-full flex items-center justify-center">
+                            <span className="text-indigo-600 font-medium text-sm">
+                              {getNombreSeguro(asistencia.profesora, 'P').charAt(0)}
                             </span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="text-red-500 mr-2" size={20} />
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                              Ausente
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {getNombreSeguro(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {getEspecialidadSegura(asistencia.profesora || findProfesoraById(asistencia.profesora_id))}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {getNombreSeguro(asistencia.aprendiz)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {asistencia.aprendiz?.documento || 'Sin documento'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="mr-3 h-4 w-4"
+                            checked={!!asistencia.presente}
+                            onChange={async () => {
+                              try {
+                                await asistenciaService.toggleAsistencia(asistencia.aprendiz_id || asistencia.aprendiz?.id, asistencia.fecha, !asistencia.presente);
+                                setAsistencias(prev => prev.map(a => a.id === asistencia.id ? { ...a, presente: !a.presente } : a));
+                              } catch (e) {
+                                console.error('Error toggling asistencia row:', e);
+                                alert('No se pudo actualizar asistencia: ' + (e.message || e));
+                              }
+                            }}
+                          />
+                          {asistencia.presente ? (
+                            <>
+                              <CheckCircle className="text-green-500 mr-2" size={20} />
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                Presente
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="text-red-500 mr-2" size={20} />
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                Ausente
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ].filter(Boolean);
+                })}
               </tbody>
             </table>
           </div>
@@ -409,57 +502,6 @@ const AsistenciaModule = ({ token }) => {
             <button className="bg-green-500 text-white px-3 py-2 rounded" type="submit">Importar Excel</button>
             <button type="button" onClick={handleExport} className="bg-blue-500 text-white px-3 py-2 rounded">Exportar CSV</button>
           </form>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <h3 className="font-semibold mb-2">Aprendices</h3>
-            <ul>
-              {aprendices.map(a => (
-                <li key={a.id} className="flex justify-between items-center border-b py-1">
-                  <div>
-                    <strong>{getNombreSeguro(a)}</strong>
-                    <div className="text-sm text-gray-600">{a.documento || 'Sin documento'}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="text-sm">Total: {a.total || 0}</div>
-                    <button className="text-sm bg-gray-200 px-2 rounded" onClick={() => verDetalle(a.id)}>Ver</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="col-span-2">
-            {detalle ? (
-              <div>
-                <h3 className="font-semibold">{getNombreSeguro(detalle)} - {detalle.documento || 'Sin documento'}</h3>
-                <table className="table-auto border-collapse w-full mt-2">
-                  <thead>
-                    <tr>
-                      {(detalle.fechas || []).map(f =>
-                        <th key={f} className="border p-1 text-sm">{new Date(f).toLocaleDateString()}</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {(detalle.fechas || []).map(f => {
-                        const val = detalle.asistencias && detalle.asistencias[f] || false;
-                        return (
-                          <td key={f} className="border p-2 text-center">
-                            <input type="checkbox" checked={!!val} onChange={() => onToggle(detalle.id, f, !!val)} />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-600">Selecciona un aprendiz para ver detalle</div>
-            )}
-          </div>
         </div>
       </div>
     </div>

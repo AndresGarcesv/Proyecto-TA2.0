@@ -8,6 +8,8 @@ const AprendicesManagement = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProfesora, setSelectedProfesora] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20; // máximo 20 resultados por página
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -23,6 +25,11 @@ const AprendicesManagement = ({ user }) => {
     fetchAprendices();
     fetchProfesoras();
   }, [selectedProfesora]);
+
+  // Resetear página cuando cambian filtros o búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedProfesora]);
 
   const fetchAprendices = async () => {
     try {
@@ -189,6 +196,16 @@ const AprendicesManagement = ({ user }) => {
     (aprendiz.documento && aprendiz.documento.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Paginación cliente: obtener slice
+  const total = filteredAprendices.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const paginatedAprendices = filteredAprendices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Ajustar currentPage si queda fuera de rango cuando cambian filtros
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages]);
+
   const canManageAprendiz = (aprendiz) => {
     return user?.is_admin || aprendiz.profesora_id === user?.id;
   };
@@ -253,13 +270,26 @@ const AprendicesManagement = ({ user }) => {
 
       {/* Lista de aprendices */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">
             Aprendices ({filteredAprendices.length})
           </h3>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600">Mostrando {((currentPage-1)*PAGE_SIZE)+1}-{Math.min(currentPage*PAGE_SIZE, total)} de {total}</div>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200"
+              disabled={currentPage === 1}
+            >Anterior</button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200"
+              disabled={currentPage >= totalPages}
+            >Siguiente</button>
+          </div>
         </div>
 
-        {filteredAprendices.length === 0 ? (
+  {filteredAprendices.length === 0 ? (
           <div className="text-center py-12">
             <Users className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron aprendices</h3>
@@ -287,7 +317,7 @@ const AprendicesManagement = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAprendices.map((aprendiz) => {
+                {paginatedAprendices.map((aprendiz) => {
                   const profesora = profesoras.find(p => p.id === aprendiz.profesora_id);
                   return (
                     <tr key={aprendiz.id} className="hover:bg-gray-50">

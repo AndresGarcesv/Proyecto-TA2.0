@@ -19,16 +19,14 @@ const navItems = [
   return (
     <nav className="bg-white shadow-lg border-b">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20 md:h-36 lg:h-20">
           {/* Logo y título */}
           <div className="flex items-center space-x-4">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <User className="text-white" size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">TecnoAcademia</h1>
-              <p className="text-sm text-gray-600">Sistema de Asistencia</p>
-            </div>
+              <div>
+                {/* Reemplazar el icono por el logo oficial. Coloca el archivo `logo_tecno4-removebg-preview.png` en `FrontEnd/public/` */}
+                <img src="/logo_tecno4-removebg-preview.png" alt="TecnoAcademia" className="h-24 w-24 sm:h-28 sm:w-28 md:h-36 md:w-36 lg:h-44 lg:w-44 object-contain mr-6" />
+              </div>
+            {/* Logo only: title and subtitle removed as requested */}
           </div>
 
           {/* Navegación principal */}

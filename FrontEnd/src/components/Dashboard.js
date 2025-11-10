@@ -120,7 +120,7 @@ const Dashboard = ({ user }) => {
       {/* Bienvenida */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-6 text-white">
         <h1 className="text-2xl font-bold mb-2">
-          ¡Bienvenida, {user?.nombre || 'Usuario'}!
+          ¡Bienvenid@, {user?.nombre || 'Usuario'}!
         </h1>
         <p className="text-indigo-100">
           Linea de {user?.especialidad || 'No especificada'}
